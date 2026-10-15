@@ -1,0 +1,50 @@
+services:
+  backend:
+    build:
+      context: .
+    ports:
+      - "${PORT:-4000}:${PORT:-4000}"
+    environment:
+      NODE_ENV: production
+      PORT: "${PORT:-4000}"
+      FRONTEND_URL: "${FRONTEND_URL:-http://localhost:3000}"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_NAME: "${MYSQL_DATABASE:-erp}"
+      DB_USER: "${MYSQL_USER:-erp}"
+      DB_PASSWORD: "${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in backend/.env}"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 15s
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: "${MYSQL_DATABASE:-erp}"
+      MYSQL_USER: "${MYSQL_USER:-erp}"
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in backend/.env}"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in backend/.env}"
+      MYSQL_ROOT_HOST: localhost
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          MYSQL_PWD="$${MYSQL_PASSWORD}" mysql
+          --protocol=TCP --host=127.0.0.1 --user="$${MYSQL_USER}"
+          --database="$${MYSQL_DATABASE}" --execute="SELECT 1" > /dev/null
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 12
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+volumes:
+  mysql_data:
