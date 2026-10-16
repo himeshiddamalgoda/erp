@@ -1,0 +1,36 @@
+import { Router } from "express";
+import { authContext } from "../../middleware/auth-context.js";
+import { businessDate, env } from "../../config/env.js";
+import { AppError } from "../../shared/errors.js";
+import { loadQuotationOptions } from "./reference-data.repository.js";
+
+export function referenceDataRoutes(context) {
+  const router = Router();
+  router.use(authContext);
+  router.get("/quotation-options", async (req, res) => {
+    const { user, ...options } = await loadQuotationOptions(context, req.user);
+    if (!user?.isActive)
+      throw new AppError(
+        401,
+        "INVALID_PRINCIPAL",
+        "An active principal is required",
+      );
+    res.set("Cache-Control", "private, no-store").json({
+      data: {
+        actor: {
+          id: user.id,
+          displayName: user.displayName,
+          role: req.user.role,
+          salesTeamIds: req.user.salesTeamIds,
+        },
+        company: {
+          timezone: env.timezone,
+          businessDate: businessDate(),
+          currencies: ["USD", "LKR", "GBP", "EUR"],
+        },
+        ...options,
+      },
+    });
+  });
+  return router;
+}

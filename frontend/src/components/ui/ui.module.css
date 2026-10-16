@@ -1,0 +1,100 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  padding: 5px 9px;
+  border-radius: 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.neutral {
+  background: var(--color-neutral-bg);
+  color: var(--color-neutral-ink);
+}
+.amber {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-ink);
+}
+.green {
+  background: var(--color-success-bg);
+  color: var(--color-success-ink);
+}
+.blue {
+  background: var(--color-info-bg);
+  color: var(--color-info-ink);
+}
+.teal {
+  background: var(--color-teal-100);
+  color: var(--color-teal-700);
+}
+.red {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-ink);
+}
+.purple {
+  background: var(--color-conversion-bg);
+  color: var(--color-conversion-ink);
+}
+.loading {
+  display: grid;
+  gap: 16px;
+  padding-block: 12px;
+}
+.skeletonCards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.errorState {
+  padding: 80px 20px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--color-muted);
+}
+.errorState h2 {
+  color: var(--color-ink);
+  margin: 6px 0;
+  font-size: 22px;
+}
+.errorState p {
+  max-width: 480px;
+  margin: 0;
+}
+.errorState small {
+  font-family: monospace;
+}
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+.errorAlert {
+  margin-bottom: 20px;
+}
+.requestId {
+  display: block;
+  font-size: 11px;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+.notFound {
+  padding: 15vh 24px;
+  text-align: center;
+}
+.notFound a {
+  color: var(--color-primary);
+}

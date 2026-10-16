@@ -136,7 +136,7 @@ npm ci
 npm run dev
 ```
 
-Open <http://localhost:3000>. Click **Check connection** to verify the Express API is reachable. The frontend can start and build without the backend running.
+Open <http://localhost:3000/orders/quotations>. The quotation workspace includes list, create/edit, details, approval, issue, buyer response, revisions, PDF download and conversion to a Draft sales order. Set up the quotation database and development actor as described below. See [frontend setup and architecture](frontend/README.md) for environment variables, feature structure and tests.
 
 `npm run lint` checks the frontend. For production, run `npm run build` followed by `npm start` inside `frontend/`.
 

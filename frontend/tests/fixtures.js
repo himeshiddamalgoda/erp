@@ -1,0 +1,116 @@
+export const ids = {
+  quote: "80000000-0000-4000-8000-000000000001",
+  customer: "30000000-0000-4000-8000-000000000001",
+  team: "20000000-0000-4000-8000-000000000001",
+  owner: "10000000-0000-4000-8000-000000000001",
+  style: "50000000-0000-4000-8000-000000000001",
+  billing: "40000000-0000-4000-8000-000000000001",
+  shipping: "40000000-0000-4000-8000-000000000002",
+};
+export const lines = ["Navy", "White"].flatMap((colour) =>
+  ["S", "M", "L"].map((size, index) => ({
+    id: `${colour}-${size}`,
+    styleId: ids.style,
+    styleCode: "TS-100",
+    styleName: "Cotton T-shirt",
+    fabric: "100% cotton",
+    gsm: 180,
+    colour,
+    size,
+    qty: index === 2 ? 100 : 200,
+    unitPrice: "5.50",
+    lineTotal: index === 2 ? "550.00" : "1100.00",
+  })),
+);
+export const quotation = {
+  id: ids.quote,
+  familyId: "90000000-0000-4000-8000-000000000001",
+  quoteNumber: "QT-2026-0001",
+  revision: 1,
+  status: "Draft",
+  version: 1,
+  customerId: ids.customer,
+  customerName: "Ocean Apparel",
+  salesTeamId: ids.team,
+  ownerId: ids.owner,
+  currency: "USD",
+  quotationDate: "2026-10-16",
+  validUntil: "2026-10-31",
+  requestedDeliveryDate: "2026-11-30",
+  billingAddressId: ids.billing,
+  shippingAddressId: ids.shipping,
+  paymentTerms: "30% advance; 70% before shipment",
+  notes: "Internal packing note",
+  lines,
+  totalQty: 1000,
+  subtotal: "5500.00",
+  total: "5500.00",
+  allowedActions: ["edit", "delete", "submit", "pdf"],
+  familyLocked: false,
+  createdAt: "2026-10-16T04:00:00.000Z",
+  updatedAt: "2026-10-16T04:00:00.000Z",
+};
+export const options = {
+  actor: { id: ids.owner, displayName: "Demo Sales", role: "Sales" },
+  company: {
+    businessDate: "2026-10-16",
+    currencies: ["USD", "LKR", "GBP", "EUR"],
+  },
+  teams: [
+    {
+      id: ids.team,
+      name: "Apparel Sales",
+      members: [{ id: ids.owner, displayName: "Demo Sales" }],
+    },
+  ],
+  customers: [
+    {
+      id: ids.customer,
+      code: "OCEAN",
+      name: "Ocean Apparel",
+      salesTeamId: ids.team,
+      ownerId: ids.owner,
+      currency: "USD",
+      paymentTerms: quotation.paymentTerms,
+      addresses: [
+        {
+          id: ids.billing,
+          addressType: "billing",
+          line1: "100 Ocean Avenue",
+          city: "New York",
+          country: "US",
+          isDefault: true,
+        },
+        {
+          id: ids.shipping,
+          addressType: "shipping",
+          line1: "100 Ocean Avenue",
+          city: "New York",
+          country: "US",
+          isDefault: true,
+        },
+      ],
+      contacts: [
+        {
+          id: "contact",
+          name: "Ocean Purchasing",
+          email: "purchasing@example.com",
+        },
+      ],
+    },
+  ],
+  styles: [
+    {
+      id: ids.style,
+      code: "TS-100",
+      name: "Cotton T-shirt",
+      fabricDescription: "100% cotton",
+      gsm: 180,
+      variants: lines.map((line, i) => ({
+        id: String(i),
+        colour: line.colour,
+        size: line.size,
+      })),
+    },
+  ],
+};

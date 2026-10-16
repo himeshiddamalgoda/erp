@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createQuotationContext } from "./db/context.js";
+import { referenceDataRoutes } from "./modules/reference-data/reference-data.routes.js";
 import { quotationRoutes } from "./modules/quotations/quotation.routes.js";
 import { errorHandler, AppError } from "./shared/errors.js";
 import { assertAuthConfiguration } from "./config/env.js";
@@ -31,6 +32,7 @@ export function createApp({
   app.use(express.json({ limit: "1mb" }));
   if (principalMiddleware) app.use(principalMiddleware);
   app.use("/api/v1/quotations", quotationRoutes(context.service));
+  app.use("/api/v1/reference-data", referenceDataRoutes(context));
   app.locals.quotations = context;
 
   app.get("/api/health", (_request, response) => {

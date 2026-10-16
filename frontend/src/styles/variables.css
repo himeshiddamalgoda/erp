@@ -1,0 +1,69 @@
+:root {
+  --font-body:
+    "Inter Variable", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  --color-primary: var(--mui-palette-primary-main, #087f8c);
+  --color-ink: var(--mui-palette-text-primary, #24364b);
+  --color-muted: var(--mui-palette-text-secondary, #69788c);
+  --color-surface: #fff;
+  --color-background: #f5f7fb;
+  --color-border: #e3e9f0;
+  --color-navy: #14283d;
+  --color-soft-teal: #e8f5f5;
+  --color-soft-amber: #fff3de;
+  --color-danger: #b74351;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --sidebar-width: 238px;
+  --header-height: 76px;
+  --shadow-card: 0 2px 5px rgb(20 40 61 / 2%), 0 6px 20px rgb(20 40 61 / 2%);
+}
+
+/* Shared palette: components reference tokens instead of declaring local colours. */
+:root {
+  --color-white: #ffffff;
+  --color-slate-25: #fafbfc;
+  --color-slate-50: #f5f7fb;
+  --color-slate-75: #f1f4f8;
+  --color-slate-100: #ecf0f5;
+  --color-slate-150: #e4eaf1;
+  --color-slate-200: #d5dfe8;
+  --color-slate-300: #b8c5d0;
+  --color-slate-400: #98a5b3;
+  --color-slate-500: #8192a4;
+  --color-slate-600: #69788c;
+  --color-slate-700: #52677d;
+  --color-slate-800: #334759;
+  --color-slate-850: #2c465d;
+  --color-slate-900: #24364b;
+  --color-neutral-bg: #ecf0f5;
+  --color-neutral-ink: #627286;
+  --color-warning-bg: #fff2dc;
+  --color-warning-ink: #a46918;
+  --color-success-bg: #e5f3eb;
+  --color-success-ink: #2f7c58;
+  --color-info-bg: #e6f0fb;
+  --color-info-ink: #3774a7;
+  --color-acceptance-bg: #e0f3ef;
+  --color-acceptance-ink: #147d6a;
+  --color-danger-bg: #fbe9eb;
+  --color-danger-ink: #b24755;
+  --color-conversion-bg: #eee8fa;
+  --color-conversion-ink: #775ba4;
+  --color-teal-50: #eff8f7;
+  --color-teal-100: #e0f3ef;
+  --color-teal-200: #cde7df;
+  --color-teal-300: #a7d8d3;
+  --color-teal-400: #80d1cd;
+  --color-teal-500: #4d929a;
+  --color-teal-700: #147d6a;
+  --color-white-rgb: 255 255 255;
+}

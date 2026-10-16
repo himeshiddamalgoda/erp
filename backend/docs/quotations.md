@@ -187,3 +187,9 @@ Successful writes include committed audit history and new version. Errors use `{
 ## Postman collection
 
 Import [the quotation collection](postman/quotations.postman_collection.json) and [local environment](postman/local.postman_environment.json). The collection covers all 15 operations with complete happy-path and alternative lifecycle folders, dynamic dates, saved revision IDs/versions, PDF checks and idempotent conversion retries. See [Postman setup and run instructions](postman/README.md) for the separate Sales/Manager development servers.
+
+## Frontend reference data
+
+The quotation frontend uses `GET /api/v1/reference-data/quotation-options` to load its form prerequisites. This is a separate read-only lookup endpoint; the quotation resource still has 15 operations. It requires the same trusted principal as quotations and returns `{ data: { actor, company, customers, teams, styles } }`. `actor` contains the authenticated ID, display name, role and team IDs. `company` contains the business date, timezone and supported currencies. Buyers include active contacts and typed addresses; teams include active members; active PCS styles include active colour/size variants. Buyer and team visibility follows the actor's team scope, with global access for Admin. Inactive actors receive no lookup access. The frontend never supplies an actor or role header to this endpoint.
+
+See [frontend setup, screen mapping and tests](../../frontend/README.md).

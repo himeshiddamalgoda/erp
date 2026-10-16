@@ -16,7 +16,7 @@ import { migrate } from "../../src/db/migrate.js";
 import { createQuotationContext } from "../../src/db/context.js";
 import { seedDemo, demoInput } from "../../src/db/seeders/demo.js";
 import { demoIds as ids } from "../../src/middleware/auth-context.js";
-import { businessDate } from "../../src/config/env.js";
+import { businessDate, env } from "../../src/config/env.js";
 import { createApp } from "../../src/app.js";
 const databaseName = process.env.TEST_DB_NAME;
 const skip = !databaseName
@@ -31,6 +31,9 @@ if (
   throw new Error("Refusing unsafe test database");
 
 test("MySQL quotations HTTP integration", { skip }, async (t) => {
+  const originalDevelopmentAuth = env.developmentAuth;
+  env.developmentAuth = false;
+  t.after(() => { env.developmentAuth = originalDevelopmentAuth; });
   const db = createSequelize({ database: databaseName });
   const context = createQuotationContext(db);
   const m = context.models;
@@ -109,6 +112,46 @@ test("MySQL quotations HTTP integration", { skip }, async (t) => {
     return date.toISOString().slice(0, 10);
   };
 
+  await t.test(
+    "reference data is active, team scoped and safe for form selectors",
+    async () => {
+      const path = "/api/v1/reference-data/quotation-options";
+      assert.equal((await request(app).get(path)).status, 401);
+      const response = await request(app)
+        .get(path)
+        .set("X-Test-Actor", "sales");
+      assert.equal(response.status, 200, JSON.stringify(response.body));
+      assert.equal(response.body.data.actor.role, "Sales");
+      assert.equal(
+        response.body.data.customers.find((c) => c.id === ids.customer)
+          .addresses.length,
+        2,
+      );
+      assert.equal(
+        response.body.data.styles.find((s) => s.id === ids.style).variants
+          .length,
+        6,
+      );
+      assert.ok(
+        response.body.data.teams.every((team) =>
+          actors.sales.salesTeamIds.includes(team.id),
+        ),
+      );
+      assert.ok(
+        response.body.data.teams.every((team) =>
+          team.members.every((member) =>
+            Object.keys(member).every((k) => ["id", "displayName"].includes(k)),
+          ),
+        ),
+      );
+      const outside = await request(app)
+        .get(path)
+        .set("X-Test-Actor", "outsider");
+      assert.equal(outside.status, 200);
+      assert.deepEqual(outside.body.data.customers, []);
+      assert.deepEqual(outside.body.data.teams, []);
+    },
+  );
   await t.test(
     "concurrent migration checks serialize and release their advisory lock",
     async () => {
