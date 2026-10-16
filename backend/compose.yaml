@@ -5,7 +5,11 @@ services:
     ports:
       - "${PORT:-4000}:${PORT:-4000}"
     environment:
-      NODE_ENV: production
+      NODE_ENV: "${NODE_ENV:-production}"
+      DEV_AUTH_ENABLED: "${DEV_AUTH_ENABLED:-false}"
+      DEV_ACTOR: "${DEV_ACTOR:-sales}"
+      COMPANY_TIMEZONE: "${COMPANY_TIMEZONE:-Asia/Colombo}"
+      COMPANY_NAME: "${COMPANY_NAME:-Garment ERP}"
       PORT: "${PORT:-4000}"
       FRONTEND_URL: "${FRONTEND_URL:-http://localhost:3000}"
       DB_HOST: mysql

@@ -4,7 +4,8 @@ import { createDatabase } from "./database.js";
 
 const port = Number(process.env.PORT || 4000);
 const database = createDatabase();
-const server = createApp({ database }).listen(port, () => {
+const app = createApp({ database });
+const server = app.listen(port, process.env.HOST || "0.0.0.0", () => {
   console.log(`ERP backend listening on http://localhost:${port}`);
 });
 
@@ -21,7 +22,7 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
     setTimeout(() => process.exit(1), 10000).unref();
     server.close(async () => {
       try {
-        await database.close();
+        await Promise.all([database.close(), app.locals.quotations.close()]);
         process.exit(0);
       } catch (error) {
         console.error("Failed to close database connections:", error.message);

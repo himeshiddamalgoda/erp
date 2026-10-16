@@ -162,3 +162,9 @@ git push -u origin main
 ```
 
 Do not initialize separate Git repositories inside the app folders. When deploying, use `backend/` and `frontend/` as the respective service root directories.
+
+## Quotation backend
+
+The quotation module adds exactly 15 operations under `/api/v1/quotations`, Sequelize migrations/seed data, team authorization, revision lifecycle, PDF and idempotent conversion to a Draft sales order. See [setup, schema, commands and UI integration](backend/docs/quotations.md) and the [OpenAPI contract](backend/docs/quotations.openapi.yaml).
+
+From `backend/`, run `npm run migrate`, `npm run seed`, then `DEV_AUTH_ENABLED=true DEV_ACTOR=sales npm run dev` for local development. `npm run demo` runs the full two-actor HTTP happy path. For MySQL integration tests use a separately provisioned database: `TEST_DB_NAME=erp_quotation_test npm test`. The development principal is disabled by default and rejected at production startup when enabled; production requires trusted authentication middleware.

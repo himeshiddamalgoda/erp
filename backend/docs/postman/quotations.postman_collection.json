@@ -1,0 +1,2231 @@
+{
+  "info": {
+    "_postman_id": "0a3877c0-e637-4c82-a398-02905fec9d6c",
+    "name": "Garment ERP — Quotations",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "All 15 quotation APIs with executable happy-path and alternative lifecycle workflows. Import the paired local environment, migrate/seed MySQL, then start separate fixed-principal Sales and Manager development servers. Defaults: Sales http://127.0.0.1:4100/api/v1 and Manager http://127.0.0.1:4101/api/v1. No tokens or actor headers are invented: identity comes from each server's DEV_ACTOR setting. Run folders in their listed order; each folder creates its own Draft and captures actual returned IDs/versions. Generated dates use companyUtcOffsetMinutes (330 for Asia/Colombo). Running the full collection creates test commercial records and Draft orders in whichever database those servers use. See README.md in this folder for commands."
+  },
+  "variable": [
+    {
+      "key": "salesBaseUrl",
+      "value": "http://127.0.0.1:4100/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "managerBaseUrl",
+      "value": "http://127.0.0.1:4101/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "companyUtcOffsetMinutes",
+      "value": "330",
+      "type": "string"
+    },
+    {
+      "key": "customerId",
+      "value": "30000000-0000-4000-8000-000000000001",
+      "type": "string"
+    },
+    {
+      "key": "salesTeamId",
+      "value": "20000000-0000-4000-8000-000000000001",
+      "type": "string"
+    },
+    {
+      "key": "ownerId",
+      "value": "10000000-0000-4000-8000-000000000001",
+      "type": "string"
+    },
+    {
+      "key": "billingAddressId",
+      "value": "40000000-0000-4000-8000-000000000001",
+      "type": "string"
+    },
+    {
+      "key": "shippingAddressId",
+      "value": "40000000-0000-4000-8000-000000000002",
+      "type": "string"
+    },
+    {
+      "key": "styleId",
+      "value": "50000000-0000-4000-8000-000000000001",
+      "type": "string"
+    },
+    {
+      "key": "quoteId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "quoteVersion",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "quoteNumber",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "originalQuoteId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "originalQuoteVersion",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "salesOrderId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "conversionVersion",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "idempotencyKey",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "retryIdempotencyKey",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "quotationDate",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "validUntil",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "requestedDeliveryDate",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 — Happy path and idempotent conversion",
+      "description": "Run this folder first. Covers list, create, detail, update, submit, approve, issue, PDF, acceptance and conversion. Replays the original conversion and checks another key returns the same existing order.",
+      "item": [
+        {
+          "name": "List quotations — filters and pagination",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations?page=1&pageSize=20&sortBy=createdAt&sortOrder=desc&includeRevisions=false",
+            "description": "Optional query filters: q, status, customerId, salesTeamId, ownerId, fromDate, toDate. Latest nondeleted revision per family by default; includeRevisions=true returns history."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  ",
+                  "  ",
+                  "  pm.test('Pagination metadata', function () { pm.expect(payload.meta.page).to.equal(1); pm.expect(payload.meta.pageSize).to.equal(20); pm.expect(data).to.be.an('array'); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Draft — Ocean Apparel, 1,000 PCS / USD 5,500.00",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"salesTeamId\": \"{{salesTeamId}}\",\n  \"ownerId\": \"{{ownerId}}\",\n  \"currency\": \"USD\",\n  \"quotationDate\": \"{{quotationDate}}\",\n  \"validUntil\": \"{{validUntil}}\",\n  \"requestedDeliveryDate\": \"{{requestedDeliveryDate}}\",\n  \"billingAddressId\": \"{{billingAddressId}}\",\n  \"shippingAddressId\": \"{{shippingAddressId}}\",\n  \"paymentTerms\": \"30% advance; 70% before shipment\",\n  \"notes\": \"Staff-only: Pack by colour and size\",\n  \"lines\": [\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"Navy\",\n      \"size\": \"S\",\n      \"qty\": 200,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"Navy\",\n      \"size\": \"M\",\n      \"qty\": 200,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"Navy\",\n      \"size\": \"L\",\n      \"qty\": 100,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"White\",\n      \"size\": \"S\",\n      \"qty\": 200,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"White\",\n      \"size\": \"M\",\n      \"qty\": 200,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"White\",\n      \"size\": \"L\",\n      \"qty\": 100,\n      \"unitPrice\": \"5.50\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Creates a new family and Draft. Generates current company-local dates with +15-day validity and +45-day delivery. Resets saved workflow variables so this folder can be rerun safely. Requires npm run migrate and npm run seed."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const offset = Number(pm.variables.get('companyUtcOffsetMinutes') || 330);",
+                  "if (!Number.isFinite(offset) || Math.abs(offset) > 840) throw new Error('companyUtcOffsetMinutes must be between -840 and 840');",
+                  "const today = new Date(Date.now() + offset * 60000).toISOString().slice(0,10);",
+                  "function future(days) { const date = new Date(today + 'T12:00:00Z'); date.setUTCDate(date.getUTCDate() + days); return date.toISOString().slice(0,10); }",
+                  "pm.collectionVariables.set('quotationDate', today);",
+                  "pm.collectionVariables.set('validUntil', future(15));",
+                  "pm.collectionVariables.set('requestedDeliveryDate', future(45));",
+                  "for (const name of ['quoteId','quoteVersion','quoteNumber','originalQuoteId','originalQuoteVersion','salesOrderId','idempotencyKey','retryIdempotencyKey','conversionVersion']) pm.collectionVariables.unset(name);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 201 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is Draft', function () { pm.expect(data.status).to.equal('Draft'); });",
+                  "  pm.test('Ocean example totals', function () { pm.expect(data.totalQty).to.equal(1000); pm.expect(data.subtotal).to.equal('5500.00'); pm.expect(data.total).to.equal('5500.00'); pm.expect(data.lines).to.have.lengthOf(6); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get current revision — refresh version and allowedActions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}",
+            "description": "Refresh before editing an existing revision. Saves its ID, number and version; inspect allowedActions before calling actions."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  ",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Edit Draft — update internal notes",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{quoteVersion}},\n  \"notes\": \"Staff-only: Revised packing instructions\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Only supplied editable fields change. To replace lines, supply the entire nonempty lines array; line IDs may change. Uses the saved current version."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is Draft', function () { pm.expect(data.status).to.equal('Draft'); });",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit for approval",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}/submit",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{quoteVersion}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Uses quoteId and quoteVersion from the most recent successful detail/action response. Failed requests do not change saved IDs or versions."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is PendingApproval', function () { pm.expect(data.status).to.equal('PendingApproval'); });",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Approve — separate manager",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{managerBaseUrl}}/quotations/{{quoteId}}/approve",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{quoteVersion}},\n  \"comment\": \"Pricing reviewed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Uses managerBaseUrl because the approver must differ from the submitter. Both servers connect to the same MySQL database."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is Approved', function () { pm.expect(data.status).to.equal('Approved'); });",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Issue manually",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}/issue",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{quoteVersion}},\n  \"channel\": \"manual\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Uses quoteId and quoteVersion from the most recent successful detail/action response. Failed requests do not change saved IDs or versions."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is Issued', function () { pm.expect(data.status).to.equal('Issued'); });",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Download quotation PDF",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/pdf"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}/pdf",
+            "description": "Use Send and Download in Postman to save the PDF. Tests verify PDF content type and attachment header. Does not change status."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('PDF attachment', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/pdf'); pm.expect(pm.response.headers.get('Content-Disposition')).to.include('attachment'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record buyer response",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}/buyer-response",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{quoteVersion}},\n  \"decision\": \"Accepted\",\n  \"reference\": \"Buyer email recorded during Postman test\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Records a staff-reported buyer response for the active, unexpired issued offer. Does not send email or perform e-signing."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is Accepted', function () { pm.expect(data.status).to.equal('Accepted'); });",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Convert accepted quotation — first attempt",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}/convert",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{conversionVersion}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Generates an idempotency key once and freezes the accepted version for all retries. Stores salesOrderId. Does not replace quoteVersion with the order version."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('idempotencyKey')) { pm.collectionVariables.set('idempotencyKey', pm.variables.replaceIn('{{$guid}}')); pm.collectionVariables.set('conversionVersion', pm.collectionVariables.get('quoteVersion')); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 201 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  ",
+                  "  ",
+                  "  pm.test('Draft order, exact quote total', function () { pm.expect(data.status).to.equal('Draft'); pm.expect(data.total).to.equal('5500.00'); pm.expect(data.sourceQuotationId).to.equal(pm.collectionVariables.get('quoteId')); });",
+                  "pm.collectionVariables.set('salesOrderId', data.salesOrderId);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Replay identical conversion — same key and payload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}/convert",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{conversionVersion}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Reuses the exact same key and accepted version. Expected 201 is the saved original response, not a second creation."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 201 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  ",
+                  "  ",
+                  "  pm.test('Same linked order', function () { pm.expect(data.salesOrderId).to.equal(pm.collectionVariables.get('salesOrderId')); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Retry conversion with another key — existing order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{retryIdempotencyKey}}"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}/convert",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{conversionVersion}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "A new key on an already converted quotation returns the same order with 200, even with the old accepted version."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('retryIdempotencyKey')) pm.collectionVariables.set('retryIdempotencyKey', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  ",
+                  "  ",
+                  "  pm.test('No duplicate order', function () { pm.expect(data.salesOrderId).to.equal(pm.collectionVariables.get('salesOrderId')); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get current revision — refresh version and allowedActions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}",
+            "description": "Refresh before editing an existing revision. Saves its ID, number and version; inspect allowedActions before calling actions."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  ",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 — Rejection and withdrawal cycles",
+      "description": "Independent fixture: create, submit, reject, edit/resubmit, then withdraw.",
+      "item": [
+        {
+          "name": "Create Draft — Ocean Apparel, 1,000 PCS / USD 5,500.00",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"salesTeamId\": \"{{salesTeamId}}\",\n  \"ownerId\": \"{{ownerId}}\",\n  \"currency\": \"USD\",\n  \"quotationDate\": \"{{quotationDate}}\",\n  \"validUntil\": \"{{validUntil}}\",\n  \"requestedDeliveryDate\": \"{{requestedDeliveryDate}}\",\n  \"billingAddressId\": \"{{billingAddressId}}\",\n  \"shippingAddressId\": \"{{shippingAddressId}}\",\n  \"paymentTerms\": \"30% advance; 70% before shipment\",\n  \"notes\": \"Staff-only: Pack by colour and size\",\n  \"lines\": [\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"Navy\",\n      \"size\": \"S\",\n      \"qty\": 200,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"Navy\",\n      \"size\": \"M\",\n      \"qty\": 200,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"Navy\",\n      \"size\": \"L\",\n      \"qty\": 100,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"White\",\n      \"size\": \"S\",\n      \"qty\": 200,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"White\",\n      \"size\": \"M\",\n      \"qty\": 200,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"White\",\n      \"size\": \"L\",\n      \"qty\": 100,\n      \"unitPrice\": \"5.50\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Creates a new family and Draft. Generates current company-local dates with +15-day validity and +45-day delivery. Resets saved workflow variables so this folder can be rerun safely. Requires npm run migrate and npm run seed."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const offset = Number(pm.variables.get('companyUtcOffsetMinutes') || 330);",
+                  "if (!Number.isFinite(offset) || Math.abs(offset) > 840) throw new Error('companyUtcOffsetMinutes must be between -840 and 840');",
+                  "const today = new Date(Date.now() + offset * 60000).toISOString().slice(0,10);",
+                  "function future(days) { const date = new Date(today + 'T12:00:00Z'); date.setUTCDate(date.getUTCDate() + days); return date.toISOString().slice(0,10); }",
+                  "pm.collectionVariables.set('quotationDate', today);",
+                  "pm.collectionVariables.set('validUntil', future(15));",
+                  "pm.collectionVariables.set('requestedDeliveryDate', future(45));",
+                  "for (const name of ['quoteId','quoteVersion','quoteNumber','originalQuoteId','originalQuoteVersion','salesOrderId','idempotencyKey','retryIdempotencyKey','conversionVersion']) pm.collectionVariables.unset(name);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 201 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is Draft', function () { pm.expect(data.status).to.equal('Draft'); });",
+                  "  pm.test('Ocean example totals', function () { pm.expect(data.totalQty).to.equal(1000); pm.expect(data.subtotal).to.equal('5500.00'); pm.expect(data.total).to.equal('5500.00'); pm.expect(data.lines).to.have.lengthOf(6); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit for approval",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}/submit",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{quoteVersion}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Uses quoteId and quoteVersion from the most recent successful detail/action response. Failed requests do not change saved IDs or versions."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is PendingApproval', function () { pm.expect(data.status).to.equal('PendingApproval'); });",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject — return to Draft",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{managerBaseUrl}}/quotations/{{quoteId}}/reject",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{quoteVersion}},\n  \"reason\": \"Please review unit prices\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Uses quoteId and quoteVersion from the most recent successful detail/action response. Failed requests do not change saved IDs or versions."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is Draft', function () { pm.expect(data.status).to.equal('Draft'); });",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Edit Draft — update internal notes",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{quoteVersion}},\n  \"notes\": \"Staff-only: Revised packing instructions\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Only supplied editable fields change. To replace lines, supply the entire nonempty lines array; line IDs may change. Uses the saved current version."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is Draft', function () { pm.expect(data.status).to.equal('Draft'); });",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit for approval",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}/submit",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{quoteVersion}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Uses quoteId and quoteVersion from the most recent successful detail/action response. Failed requests do not change saved IDs or versions."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is PendingApproval', function () { pm.expect(data.status).to.equal('PendingApproval'); });",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Withdraw — return to Draft",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}/withdraw",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{quoteVersion}},\n  \"reason\": \"Buyer changed quantities\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Uses quoteId and quoteVersion from the most recent successful detail/action response. Failed requests do not change saved IDs or versions."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is Draft', function () { pm.expect(data.status).to.equal('Draft'); });",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get current revision — refresh version and allowedActions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}",
+            "description": "Refresh before editing an existing revision. Saves its ID, number and version; inspect allowedActions before calling actions."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  ",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 — Revision, supersession, decline and void",
+      "description": "Independent fixture: issue original, create and issue replacement, confirm original was superseded, record decline, prepare another revision and void it after approval.",
+      "item": [
+        {
+          "name": "Create Draft — Ocean Apparel, 1,000 PCS / USD 5,500.00",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"salesTeamId\": \"{{salesTeamId}}\",\n  \"ownerId\": \"{{ownerId}}\",\n  \"currency\": \"USD\",\n  \"quotationDate\": \"{{quotationDate}}\",\n  \"validUntil\": \"{{validUntil}}\",\n  \"requestedDeliveryDate\": \"{{requestedDeliveryDate}}\",\n  \"billingAddressId\": \"{{billingAddressId}}\",\n  \"shippingAddressId\": \"{{shippingAddressId}}\",\n  \"paymentTerms\": \"30% advance; 70% before shipment\",\n  \"notes\": \"Staff-only: Pack by colour and size\",\n  \"lines\": [\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"Navy\",\n      \"size\": \"S\",\n      \"qty\": 200,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"Navy\",\n      \"size\": \"M\",\n      \"qty\": 200,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"Navy\",\n      \"size\": \"L\",\n      \"qty\": 100,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"White\",\n      \"size\": \"S\",\n      \"qty\": 200,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"White\",\n      \"size\": \"M\",\n      \"qty\": 200,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"White\",\n      \"size\": \"L\",\n      \"qty\": 100,\n      \"unitPrice\": \"5.50\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Creates a new family and Draft. Generates current company-local dates with +15-day validity and +45-day delivery. Resets saved workflow variables so this folder can be rerun safely. Requires npm run migrate and npm run seed."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const offset = Number(pm.variables.get('companyUtcOffsetMinutes') || 330);",
+                  "if (!Number.isFinite(offset) || Math.abs(offset) > 840) throw new Error('companyUtcOffsetMinutes must be between -840 and 840');",
+                  "const today = new Date(Date.now() + offset * 60000).toISOString().slice(0,10);",
+                  "function future(days) { const date = new Date(today + 'T12:00:00Z'); date.setUTCDate(date.getUTCDate() + days); return date.toISOString().slice(0,10); }",
+                  "pm.collectionVariables.set('quotationDate', today);",
+                  "pm.collectionVariables.set('validUntil', future(15));",
+                  "pm.collectionVariables.set('requestedDeliveryDate', future(45));",
+                  "for (const name of ['quoteId','quoteVersion','quoteNumber','originalQuoteId','originalQuoteVersion','salesOrderId','idempotencyKey','retryIdempotencyKey','conversionVersion']) pm.collectionVariables.unset(name);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 201 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is Draft', function () { pm.expect(data.status).to.equal('Draft'); });",
+                  "  pm.test('Ocean example totals', function () { pm.expect(data.totalQty).to.equal(1000); pm.expect(data.subtotal).to.equal('5500.00'); pm.expect(data.total).to.equal('5500.00'); pm.expect(data.lines).to.have.lengthOf(6); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit for approval",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}/submit",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{quoteVersion}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Uses quoteId and quoteVersion from the most recent successful detail/action response. Failed requests do not change saved IDs or versions."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is PendingApproval', function () { pm.expect(data.status).to.equal('PendingApproval'); });",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Approve — separate manager",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{managerBaseUrl}}/quotations/{{quoteId}}/approve",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{quoteVersion}},\n  \"comment\": \"Pricing reviewed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Uses managerBaseUrl because the approver must differ from the submitter. Both servers connect to the same MySQL database."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is Approved', function () { pm.expect(data.status).to.equal('Approved'); });",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Issue manually",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}/issue",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{quoteVersion}},\n  \"channel\": \"manual\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Uses quoteId and quoteVersion from the most recent successful detail/action response. Failed requests do not change saved IDs or versions."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is Issued', function () { pm.expect(data.status).to.equal('Issued'); });",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create replacement Draft revision",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}/revisions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{quoteVersion}},\n  \"reason\": \"Buyer requested updated quantity\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Saves the source ID as originalQuoteId and switches quoteId/quoteVersion to the NEW Draft. The existing offer remains valid until the replacement is issued."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('originalQuoteId', pm.collectionVariables.get('quoteId')); pm.collectionVariables.set('originalQuoteVersion', pm.collectionVariables.get('quoteVersion'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 201 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is Draft', function () { pm.expect(data.status).to.equal('Draft'); });",
+                  "  pm.test('Separate revision, same family number', function () { pm.expect(data.id).not.to.equal(pm.collectionVariables.get('originalQuoteId')); pm.expect(data.priorRevisionId).to.equal(pm.collectionVariables.get('originalQuoteId')); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit for approval",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}/submit",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{quoteVersion}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Uses quoteId and quoteVersion from the most recent successful detail/action response. Failed requests do not change saved IDs or versions."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is PendingApproval', function () { pm.expect(data.status).to.equal('PendingApproval'); });",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Approve — separate manager",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{managerBaseUrl}}/quotations/{{quoteId}}/approve",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{quoteVersion}},\n  \"comment\": \"Pricing reviewed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Uses managerBaseUrl because the approver must differ from the submitter. Both servers connect to the same MySQL database."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is Approved', function () { pm.expect(data.status).to.equal('Approved'); });",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Issue manually",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}/issue",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{quoteVersion}},\n  \"channel\": \"manual\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Uses quoteId and quoteVersion from the most recent successful detail/action response. Failed requests do not change saved IDs or versions."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is Issued', function () { pm.expect(data.status).to.equal('Issued'); });",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read original revision — now Superseded",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{originalQuoteId}}",
+            "description": "Reads saved originalQuoteId without replacing current quoteId/quoteVersion for the replacement offer."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  ",
+                  "  pm.test('Status is Superseded', function () { pm.expect(data.status).to.equal('Superseded'); });",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Record buyer response",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}/buyer-response",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{quoteVersion}},\n  \"decision\": \"Declined\",\n  \"reference\": \"Buyer email recorded during Postman test\",\n  \"reason\": \"Delivery too late\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Records a staff-reported buyer response for the active, unexpired issued offer. Does not send email or perform e-signing."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is Declined', function () { pm.expect(data.status).to.equal('Declined'); });",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create replacement Draft revision",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}/revisions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{quoteVersion}},\n  \"reason\": \"Buyer requested updated quantity\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Saves the source ID as originalQuoteId and switches quoteId/quoteVersion to the NEW Draft. The existing offer remains valid until the replacement is issued."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('originalQuoteId', pm.collectionVariables.get('quoteId')); pm.collectionVariables.set('originalQuoteVersion', pm.collectionVariables.get('quoteVersion'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 201 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is Draft', function () { pm.expect(data.status).to.equal('Draft'); });",
+                  "  pm.test('Separate revision, same family number', function () { pm.expect(data.id).not.to.equal(pm.collectionVariables.get('originalQuoteId')); pm.expect(data.priorRevisionId).to.equal(pm.collectionVariables.get('originalQuoteId')); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit for approval",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}/submit",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{quoteVersion}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Uses quoteId and quoteVersion from the most recent successful detail/action response. Failed requests do not change saved IDs or versions."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is PendingApproval', function () { pm.expect(data.status).to.equal('PendingApproval'); });",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Approve — separate manager",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{managerBaseUrl}}/quotations/{{quoteId}}/approve",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{quoteVersion}},\n  \"comment\": \"Pricing reviewed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Uses managerBaseUrl because the approver must differ from the submitter. Both servers connect to the same MySQL database."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is Approved', function () { pm.expect(data.status).to.equal('Approved'); });",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Void — manager cancels offer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{managerBaseUrl}}/quotations/{{quoteId}}/void",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{quoteVersion}},\n  \"reason\": \"Offer withdrawn\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Uses quoteId and quoteVersion from the most recent successful detail/action response. Failed requests do not change saved IDs or versions."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is Cancelled', function () { pm.expect(data.status).to.equal('Cancelled'); });",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get current revision — refresh version and allowedActions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}",
+            "description": "Refresh before editing an existing revision. Saves its ID, number and version; inspect allowedActions before calling actions."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 200 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  ",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 — Draft soft deletion",
+      "description": "Independent Draft; deletion preserves audit/lines and subsequent detail returns 404.",
+      "item": [
+        {
+          "name": "Create Draft — Ocean Apparel, 1,000 PCS / USD 5,500.00",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"salesTeamId\": \"{{salesTeamId}}\",\n  \"ownerId\": \"{{ownerId}}\",\n  \"currency\": \"USD\",\n  \"quotationDate\": \"{{quotationDate}}\",\n  \"validUntil\": \"{{validUntil}}\",\n  \"requestedDeliveryDate\": \"{{requestedDeliveryDate}}\",\n  \"billingAddressId\": \"{{billingAddressId}}\",\n  \"shippingAddressId\": \"{{shippingAddressId}}\",\n  \"paymentTerms\": \"30% advance; 70% before shipment\",\n  \"notes\": \"Staff-only: Pack by colour and size\",\n  \"lines\": [\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"Navy\",\n      \"size\": \"S\",\n      \"qty\": 200,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"Navy\",\n      \"size\": \"M\",\n      \"qty\": 200,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"Navy\",\n      \"size\": \"L\",\n      \"qty\": 100,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"White\",\n      \"size\": \"S\",\n      \"qty\": 200,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"White\",\n      \"size\": \"M\",\n      \"qty\": 200,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"White\",\n      \"size\": \"L\",\n      \"qty\": 100,\n      \"unitPrice\": \"5.50\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Creates a new family and Draft. Generates current company-local dates with +15-day validity and +45-day delivery. Resets saved workflow variables so this folder can be rerun safely. Requires npm run migrate and npm run seed."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const offset = Number(pm.variables.get('companyUtcOffsetMinutes') || 330);",
+                  "if (!Number.isFinite(offset) || Math.abs(offset) > 840) throw new Error('companyUtcOffsetMinutes must be between -840 and 840');",
+                  "const today = new Date(Date.now() + offset * 60000).toISOString().slice(0,10);",
+                  "function future(days) { const date = new Date(today + 'T12:00:00Z'); date.setUTCDate(date.getUTCDate() + days); return date.toISOString().slice(0,10); }",
+                  "pm.collectionVariables.set('quotationDate', today);",
+                  "pm.collectionVariables.set('validUntil', future(15));",
+                  "pm.collectionVariables.set('requestedDeliveryDate', future(45));",
+                  "for (const name of ['quoteId','quoteVersion','quoteNumber','originalQuoteId','originalQuoteVersion','salesOrderId','idempotencyKey','retryIdempotencyKey','conversionVersion']) pm.collectionVariables.unset(name);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 201 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is Draft', function () { pm.expect(data.status).to.equal('Draft'); });",
+                  "  pm.test('Ocean example totals', function () { pm.expect(data.totalQty).to.equal(1000); pm.expect(data.subtotal).to.equal('5500.00'); pm.expect(data.total).to.equal('5500.00'); pm.expect(data.lines).to.have.lengthOf(6); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Soft-delete Draft — If-Match version",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "If-Match",
+                "value": "\"{{quoteVersion}}\""
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}",
+            "description": "Draft only. Sends a quoted version in If-Match. Records and lines remain in history."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 204', function () { pm.response.to.have.status(204); });",
+                  "pm.test('No response body', function () { pm.expect(pm.response.text()).to.equal(''); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deleted revision — expected 404",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 404', function () { pm.response.to.have.status(404); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Error envelope with request ID', function () { pm.expect(payload.error.code).to.be.a('string'); pm.expect(payload.error.requestId).to.be.a('string'); });",
+                  "if (pm.response.code === 404 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  ",
+                  "  ",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 — Validation and concurrency errors",
+      "description": "Expected errors are intentional passing assertions. Creates its own Draft and cleans it up by soft deletion.",
+      "item": [
+        {
+          "name": "Create Draft — Ocean Apparel, 1,000 PCS / USD 5,500.00",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"salesTeamId\": \"{{salesTeamId}}\",\n  \"ownerId\": \"{{ownerId}}\",\n  \"currency\": \"USD\",\n  \"quotationDate\": \"{{quotationDate}}\",\n  \"validUntil\": \"{{validUntil}}\",\n  \"requestedDeliveryDate\": \"{{requestedDeliveryDate}}\",\n  \"billingAddressId\": \"{{billingAddressId}}\",\n  \"shippingAddressId\": \"{{shippingAddressId}}\",\n  \"paymentTerms\": \"30% advance; 70% before shipment\",\n  \"notes\": \"Staff-only: Pack by colour and size\",\n  \"lines\": [\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"Navy\",\n      \"size\": \"S\",\n      \"qty\": 200,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"Navy\",\n      \"size\": \"M\",\n      \"qty\": 200,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"Navy\",\n      \"size\": \"L\",\n      \"qty\": 100,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"White\",\n      \"size\": \"S\",\n      \"qty\": 200,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"White\",\n      \"size\": \"M\",\n      \"qty\": 200,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"White\",\n      \"size\": \"L\",\n      \"qty\": 100,\n      \"unitPrice\": \"5.50\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Creates a new family and Draft. Generates current company-local dates with +15-day validity and +45-day delivery. Resets saved workflow variables so this folder can be rerun safely. Requires npm run migrate and npm run seed."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const offset = Number(pm.variables.get('companyUtcOffsetMinutes') || 330);",
+                  "if (!Number.isFinite(offset) || Math.abs(offset) > 840) throw new Error('companyUtcOffsetMinutes must be between -840 and 840');",
+                  "const today = new Date(Date.now() + offset * 60000).toISOString().slice(0,10);",
+                  "function future(days) { const date = new Date(today + 'T12:00:00Z'); date.setUTCDate(date.getUTCDate() + days); return date.toISOString().slice(0,10); }",
+                  "pm.collectionVariables.set('quotationDate', today);",
+                  "pm.collectionVariables.set('validUntil', future(15));",
+                  "pm.collectionVariables.set('requestedDeliveryDate', future(45));",
+                  "for (const name of ['quoteId','quoteVersion','quoteNumber','originalQuoteId','originalQuoteVersion','salesOrderId','idempotencyKey','retryIdempotencyKey','conversionVersion']) pm.collectionVariables.unset(name);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Data envelope', function () { pm.expect(payload).to.have.property('data'); });",
+                  "if (pm.response.code === 201 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  pm.collectionVariables.set('quoteId', data.id); pm.collectionVariables.set('quoteVersion', data.version); pm.collectionVariables.set('quoteNumber', data.quoteNumber);",
+                  "  pm.test('Status is Draft', function () { pm.expect(data.status).to.equal('Draft'); });",
+                  "  pm.test('Ocean example totals', function () { pm.expect(data.totalQty).to.equal(1000); pm.expect(data.subtotal).to.equal('5500.00'); pm.expect(data.total).to.equal('5500.00'); pm.expect(data.lines).to.have.lengthOf(6); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Protected status patch — expected 422",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{quoteVersion}},\n  \"status\": \"Accepted\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Error envelope with request ID', function () { pm.expect(payload.error.code).to.be.a('string'); pm.expect(payload.error.requestId).to.be.a('string'); });",
+                  "if (pm.response.code === 422 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  ",
+                  "  ",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Stale edit version — expected 409",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": 4294967295,\n  \"notes\": \"Must not overwrite current Draft\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 409', function () { pm.response.to.have.status(409); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Error envelope with request ID', function () { pm.expect(payload.error.code).to.be.a('string'); pm.expect(payload.error.requestId).to.be.a('string'); });",
+                  "if (pm.response.code === 409 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  ",
+                  "  ",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sales cannot approve — expected 403",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}/approve",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{quoteVersion}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', function () { pm.response.to.have.status(403); });",
+                  "",
+                  "pm.test('JSON response', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "let payload;",
+                  "try { payload = pm.response.json(); } catch (_) {}",
+                  "pm.test('Error envelope with request ID', function () { pm.expect(payload.error.code).to.be.a('string'); pm.expect(payload.error.requestId).to.be.a('string'); });",
+                  "if (pm.response.code === 403 && payload && payload.data) {",
+                  "  const data = payload.data;",
+                  "  ",
+                  "  ",
+                  "  ",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Soft-delete Draft — If-Match version",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "If-Match",
+                "value": "\"{{quoteVersion}}\""
+              }
+            ],
+            "url": "{{salesBaseUrl}}/quotations/{{quoteId}}",
+            "description": "Draft only. Sends a quoted version in If-Match. Records and lines remain in history."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 204', function () { pm.response.to.have.status(204); });",
+                  "pm.test('No response body', function () { pm.expect(pm.response.text()).to.equal(''); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

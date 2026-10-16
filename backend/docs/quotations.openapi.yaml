@@ -1,0 +1,2411 @@
+openapi: 3.0.3
+info:
+  title: Garment ERP Quotations
+  version: 1.0.0
+  description: Revision IDs identify commercial offers within one family. Exactly 15 quotation operations. Trusted server
+    middleware supplies req.user = {id, role, salesTeamIds}. Authentication/login is outside this module; no client
+    actor IDs/roles are accepted. Development-only fixed principals are configured by server environment, never HTTP
+    headers. USD/LKR/GBP/EUR only, two decimals, PCS integer quantities, no FX/tax/freight/discounts. Company timezone
+    defaults to Asia/Colombo; validUntil includes its entire local date. Dates in examples are illustrative; demo data
+    uses future relative dates. See quotations.md for setup, roles and UI mapping.
+servers:
+  - url: /api/v1
+tags:
+  - name: Quotations
+paths:
+  /quotations:
+    get:
+      operationId: listQuotations
+      summary: List quotations
+      description: Defaults to latest nondeleted revision per family. Status and other filters apply after latest selection.
+        includeRevisions=true includes history. Scope uses authorized teams. Commercial dates are inclusive; ordering
+        always includes ID.
+      tags:
+        - Quotations
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+            maxLength: 200
+        - name: status
+          in: query
+          schema: &a19
+            type: string
+            enum: &a22
+              - Draft
+              - PendingApproval
+              - Approved
+              - Issued
+              - Accepted
+              - Declined
+              - Expired
+              - Superseded
+              - Cancelled
+              - Converted
+        - name: customerId
+          in: query
+          schema: &a1
+            type: string
+            format: uuid
+        - name: salesTeamId
+          in: query
+          schema: *a1
+        - name: ownerId
+          in: query
+          schema: *a1
+        - name: fromDate
+          in: query
+          schema: &a2
+            type: string
+            format: date
+        - name: toDate
+          in: query
+          schema: *a2
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000000
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum:
+              - createdAt
+              - quotationDate
+              - quoteNumber
+              - total
+              - updatedAt
+            default: createdAt
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: desc
+        - name: includeRevisions
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Paged quotation summaries
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/QuotationSummary"
+                  meta:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      page: &a3
+                        type: integer
+                        minimum: 1
+                      pageSize: *a3
+                      total:
+                        type: integer
+                        minimum: 0
+                    required:
+                      - page
+                      - pageSize
+                      - total
+                required:
+                  - data
+                  - meta
+              example:
+                data:
+                  - id: 80000000-0000-4000-8000-000000000001
+                    familyId: 90000000-0000-4000-8000-000000000001
+                    quoteNumber: QT-2026-0001
+                    revision: 1
+                    status: Draft
+                    customerId: 30000000-0000-4000-8000-000000000001
+                    customerName: Ocean Apparel
+                    salesTeamId: 20000000-0000-4000-8000-000000000001
+                    ownerId: 10000000-0000-4000-8000-000000000001
+                    currency: USD
+                    totalQty: 1000
+                    subtotal: "5500.00"
+                    total: "5500.00"
+                    validUntil: 2026-10-31
+                    requestedDeliveryDate: 2026-11-30
+                    version: 1
+                    createdAt: 2026-10-16T04:00:00.000Z
+                    updatedAt: 2026-10-16T04:00:00.000Z
+                meta:
+                  page: 1
+                  pageSize: 20
+                  total: 1
+        "400": &a4
+          description: Malformed JSON, query or required header
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: INVALID_REQUEST
+                  message: Malformed JSON, query or required header
+                  requestId: req-example
+        "401": &a5
+          description: A valid trusted principal is required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: UNAUTHENTICATED
+                  message: A valid trusted principal is required
+                  requestId: req-example
+        "403": &a6
+          description: Action is not permitted for this role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: FORBIDDEN
+                  message: Action is not permitted for this role
+                  requestId: req-example
+        "404": &a7
+          description: Quotation not found or outside visible scope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: NOT_FOUND
+                  message: Quotation not found or outside visible scope
+                  requestId: req-example
+        "409": &a8
+          description: Lifecycle, version, expiry or idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                STALE_VERSION:
+                  value:
+                    error:
+                      code: STALE_VERSION
+                      message: Quotation changed; reload before retrying
+                      requestId: req-example
+                INVALID_TRANSITION:
+                  value:
+                    error:
+                      code: INVALID_TRANSITION
+                      message: INVALID_TRANSITION
+                      requestId: req-example
+                QUOTATION_EXPIRED:
+                  value:
+                    error:
+                      code: QUOTATION_EXPIRED
+                      message: QUOTATION_EXPIRED
+                      requestId: req-example
+                FAMILY_ALREADY_ACCEPTED:
+                  value:
+                    error:
+                      code: FAMILY_ALREADY_ACCEPTED
+                      message: FAMILY_ALREADY_ACCEPTED
+                      requestId: req-example
+                IDEMPOTENCY_KEY_REUSED:
+                  value:
+                    error:
+                      code: IDEMPOTENCY_KEY_REUSED
+                      message: IDEMPOTENCY_KEY_REUSED
+                      requestId: req-example
+                WORKING_REVISION_EXISTS:
+                  value:
+                    error:
+                      code: WORKING_REVISION_EXISTS
+                      message: WORKING_REVISION_EXISTS
+                      requestId: req-example
+        "422": &a9
+          description: Field validation failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: VALIDATION_ERROR
+                  message: Check highlighted fields
+                  fields:
+                    lines[0].qty: Must be a positive integer
+                  requestId: req-example
+        "500": &a10
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error:
+                  code: INTERNAL_ERROR
+                  message: Internal server error
+                  requestId: req-example
+    post:
+      operationId: createQuotation
+      summary: Create Draft family and revision 1
+      description: Generates quote number and exact totals server-side. Missing final terms, validity and addresses are
+        allowed for Draft. Buyer/team/owner and variants must be active.
+      tags:
+        - Quotations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateQuotation"
+            example:
+              customerId: 30000000-0000-4000-8000-000000000001
+              salesTeamId: 20000000-0000-4000-8000-000000000001
+              ownerId: 10000000-0000-4000-8000-000000000001
+              currency: USD
+              quotationDate: 2026-10-16
+              validUntil: 2026-10-31
+              requestedDeliveryDate: 2026-11-30
+              billingAddressId: 40000000-0000-4000-8000-000000000001
+              shippingAddressId: 40000000-0000-4000-8000-000000000002
+              paymentTerms: 30% advance; 70% before shipment
+              notes: "Staff-only: Pack by colour and size"
+              lines:
+                - styleId: 50000000-0000-4000-8000-000000000001
+                  colour: Navy
+                  size: S
+                  qty: 200
+                  unitPrice: "5.50"
+                - styleId: 50000000-0000-4000-8000-000000000001
+                  colour: Navy
+                  size: M
+                  qty: 200
+                  unitPrice: "5.50"
+                - styleId: 50000000-0000-4000-8000-000000000001
+                  colour: Navy
+                  size: L
+                  qty: 100
+                  unitPrice: "5.50"
+                - styleId: 50000000-0000-4000-8000-000000000001
+                  colour: White
+                  size: S
+                  qty: 200
+                  unitPrice: "5.50"
+                - styleId: 50000000-0000-4000-8000-000000000001
+                  colour: White
+                  size: M
+                  qty: 200
+                  unitPrice: "5.50"
+                - styleId: 50000000-0000-4000-8000-000000000001
+                  colour: White
+                  size: L
+                  qty: 100
+                  unitPrice: "5.50"
+      responses:
+        "201":
+          description: Created Draft revision
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/QuotationDetail"
+                required:
+                  - data
+              example:
+                data: &a11
+                  id: 80000000-0000-4000-8000-000000000001
+                  familyId: 90000000-0000-4000-8000-000000000001
+                  quoteNumber: QT-2026-0001
+                  revision: 1
+                  status: Draft
+                  customerId: 30000000-0000-4000-8000-000000000001
+                  customerName: Ocean Apparel
+                  salesTeamId: 20000000-0000-4000-8000-000000000001
+                  ownerId: 10000000-0000-4000-8000-000000000001
+                  currency: USD
+                  totalQty: 1000
+                  subtotal: "5500.00"
+                  total: "5500.00"
+                  validUntil: 2026-10-31
+                  requestedDeliveryDate: 2026-11-30
+                  version: 1
+                  createdAt: 2026-10-16T04:00:00.000Z
+                  updatedAt: 2026-10-16T04:00:00.000Z
+                  quotationDate: 2026-10-16
+                  billingAddressId: 40000000-0000-4000-8000-000000000001
+                  shippingAddressId: 40000000-0000-4000-8000-000000000002
+                  paymentTerms: 30% advance; 70% before shipment
+                  notes: "Staff-only: Pack by colour and size"
+                  priorRevisionId: null
+                  customerSnapshot: null
+                  billingAddressSnapshot: null
+                  shippingAddressSnapshot: null
+                  draftBuyer: &a12
+                    customer: &a16
+                      id: 30000000-0000-4000-8000-000000000001
+                      code: OCEAN
+                      name: Ocean Apparel
+                      country: US
+                      currency: USD
+                      contacts:
+                        - id: 60000000-0000-4000-8000-000000000001
+                          name: Ocean Purchasing
+                          email: purchasing@example.com
+                          phone: null
+                          isPrimary: true
+                    billingAddress: &a17
+                      id: 40000000-0000-4000-8000-000000000001
+                      addressType: billing
+                      line1: 100 Ocean Avenue
+                      line2: null
+                      city: New York
+                      postalCode: "10001"
+                      country: US
+                    shippingAddress:
+                      id: 40000000-0000-4000-8000-000000000002
+                      addressType: shipping
+                      line1: 100 Ocean Avenue
+                      line2: null
+                      city: New York
+                      postalCode: "10001"
+                      country: US
+                  lines: &a18
+                    - id: b0000000-0000-4000-8000-000000000001
+                      lineNo: 1
+                      variantId: 70000000-0000-4000-8000-000000000001
+                      styleId: 50000000-0000-4000-8000-000000000001
+                      styleCode: TS-100
+                      styleName: Cotton T-shirt
+                      fabric: 100% cotton
+                      gsm: 180
+                      colour: Navy
+                      size: S
+                      uom: PCS
+                      qty: 200
+                      unitPrice: "5.50"
+                      lineTotal: "1100.00"
+                    - id: b0000000-0000-4000-8000-000000000002
+                      lineNo: 2
+                      variantId: 70000000-0000-4000-8000-000000000002
+                      styleId: 50000000-0000-4000-8000-000000000001
+                      styleCode: TS-100
+                      styleName: Cotton T-shirt
+                      fabric: 100% cotton
+                      gsm: 180
+                      colour: Navy
+                      size: M
+                      uom: PCS
+                      qty: 200
+                      unitPrice: "5.50"
+                      lineTotal: "1100.00"
+                    - id: b0000000-0000-4000-8000-000000000003
+                      lineNo: 3
+                      variantId: 70000000-0000-4000-8000-000000000003
+                      styleId: 50000000-0000-4000-8000-000000000001
+                      styleCode: TS-100
+                      styleName: Cotton T-shirt
+                      fabric: 100% cotton
+                      gsm: 180
+                      colour: Navy
+                      size: L
+                      uom: PCS
+                      qty: 100
+                      unitPrice: "5.50"
+                      lineTotal: "550.00"
+                    - id: b0000000-0000-4000-8000-000000000004
+                      lineNo: 4
+                      variantId: 70000000-0000-4000-8000-000000000004
+                      styleId: 50000000-0000-4000-8000-000000000001
+                      styleCode: TS-100
+                      styleName: Cotton T-shirt
+                      fabric: 100% cotton
+                      gsm: 180
+                      colour: White
+                      size: S
+                      uom: PCS
+                      qty: 200
+                      unitPrice: "5.50"
+                      lineTotal: "1100.00"
+                    - id: b0000000-0000-4000-8000-000000000005
+                      lineNo: 5
+                      variantId: 70000000-0000-4000-8000-000000000005
+                      styleId: 50000000-0000-4000-8000-000000000001
+                      styleCode: TS-100
+                      styleName: Cotton T-shirt
+                      fabric: 100% cotton
+                      gsm: 180
+                      colour: White
+                      size: M
+                      uom: PCS
+                      qty: 200
+                      unitPrice: "5.50"
+                      lineTotal: "1100.00"
+                    - id: b0000000-0000-4000-8000-000000000006
+                      lineNo: 6
+                      variantId: 70000000-0000-4000-8000-000000000006
+                      styleId: 50000000-0000-4000-8000-000000000001
+                      styleCode: TS-100
+                      styleName: Cotton T-shirt
+                      fabric: 100% cotton
+                      gsm: 180
+                      colour: White
+                      size: L
+                      uom: PCS
+                      qty: 100
+                      unitPrice: "5.50"
+                      lineTotal: "550.00"
+                  submittedBy: null
+                  submittedAt: null
+                  approvedBy: null
+                  approvedAt: null
+                  issuedAt: null
+                  buyerDecision: null
+                  buyerResponseReference: null
+                  buyerResponseReason: null
+                  buyerResponseAt: null
+                  salesOrderId: null
+                  linkedOrder: null
+                  familyLocked: false
+                  revisions:
+                    - id: 80000000-0000-4000-8000-000000000001
+                      revision: 1
+                      status: Draft
+                      version: 1
+                      priorRevisionId: null
+                  audit: &a13
+                    - id: c0000000-0000-4000-8000-000000000001
+                      actorId: 10000000-0000-4000-8000-000000000001
+                      action: create
+                      fromStatus: null
+                      toStatus: Draft
+                      reason: null
+                      metadata: null
+                      requestId: req-example
+                      createdAt: 2026-10-16T04:00:00.000Z
+                  allowedActions: &a14
+                    - pdf
+                    - edit
+                    - delete
+                    - submit
+        "400": *a4
+        "401": *a5
+        "403": *a6
+        "404": *a7
+        "409": *a8
+        "422": *a9
+        "500": *a10
+  /quotations/{id}:
+    parameters:
+      - &a15
+        name: id
+        in: path
+        required: true
+        schema: *a1
+        description: Quotation revision ID, not family ID.
+    get:
+      operationId: getQuotation
+      summary: Read revision detail
+      description: Includes scoped revision summaries, audit, stored commercial snapshots, linked order (including archived
+        state), and allowedActions. Draft garments and draftBuyer reflect current masters; frozen statuses use stored
+        snapshots. allowedActions does not replace server validation.
+      tags:
+        - Quotations
+      responses:
+        "200":
+          description: Quotation detail
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/QuotationDetail"
+                required:
+                  - data
+              example:
+                data: *a11
+        "400": *a4
+        "401": *a5
+        "403": *a6
+        "404": *a7
+        "409": *a8
+        "422": *a9
+        "500": *a10
+    patch:
+      operationId: patchQuotation
+      summary: Edit Draft
+      description: Requires current version and an unlocked family. Omitted fields stay unchanged. Supplied lines replace the
+        entire collection and IDs may change. No generic status/number/total/actor patch is allowed.
+      tags:
+        - Quotations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchQuotation"
+            example:
+              version: 1
+              lines:
+                - styleId: 50000000-0000-4000-8000-000000000001
+                  colour: Navy
+                  size: S
+                  qty: 1000
+                  unitPrice: "5.50"
+      responses:
+        "200":
+          description: Updated Draft
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/QuotationDetail"
+                required:
+                  - data
+              example:
+                data:
+                  id: 80000000-0000-4000-8000-000000000001
+                  familyId: 90000000-0000-4000-8000-000000000001
+                  quoteNumber: QT-2026-0001
+                  revision: 1
+                  status: Draft
+                  customerId: 30000000-0000-4000-8000-000000000001
+                  customerName: Ocean Apparel
+                  salesTeamId: 20000000-0000-4000-8000-000000000001
+                  ownerId: 10000000-0000-4000-8000-000000000001
+                  currency: USD
+                  totalQty: 1000
+                  subtotal: "5500.00"
+                  total: "5500.00"
+                  validUntil: 2026-10-31
+                  requestedDeliveryDate: 2026-11-30
+                  version: 2
+                  createdAt: 2026-10-16T04:00:00.000Z
+                  updatedAt: 2026-10-16T04:00:00.000Z
+                  quotationDate: 2026-10-16
+                  billingAddressId: 40000000-0000-4000-8000-000000000001
+                  shippingAddressId: 40000000-0000-4000-8000-000000000002
+                  paymentTerms: 30% advance; 70% before shipment
+                  notes: "Staff-only: Pack by colour and size"
+                  priorRevisionId: null
+                  customerSnapshot: null
+                  billingAddressSnapshot: null
+                  shippingAddressSnapshot: null
+                  draftBuyer: *a12
+                  lines:
+                    - id: b0000000-0000-4000-8000-000000000010
+                      lineNo: 1
+                      variantId: 70000000-0000-4000-8000-000000000001
+                      styleId: 50000000-0000-4000-8000-000000000001
+                      styleCode: TS-100
+                      styleName: Cotton T-shirt
+                      fabric: 100% cotton
+                      gsm: 180
+                      colour: Navy
+                      size: S
+                      uom: PCS
+                      qty: 1000
+                      unitPrice: "5.50"
+                      lineTotal: "5500.00"
+                  submittedBy: null
+                  submittedAt: null
+                  approvedBy: null
+                  approvedAt: null
+                  issuedAt: null
+                  buyerDecision: null
+                  buyerResponseReference: null
+                  buyerResponseReason: null
+                  buyerResponseAt: null
+                  salesOrderId: null
+                  linkedOrder: null
+                  familyLocked: false
+                  revisions:
+                    - id: 80000000-0000-4000-8000-000000000001
+                      revision: 1
+                      status: Draft
+                      version: 2
+                      priorRevisionId: null
+                  audit: *a13
+                  allowedActions: *a14
+        "400": *a4
+        "401": *a5
+        "403": *a6
+        "404": *a7
+        "409": *a8
+        "422": *a9
+        "500": *a10
+    delete:
+      operationId: deleteQuotation
+      summary: Soft-delete Draft
+      description: Only Draft in an unlocked family. Retains lines, audit and used revision number.
+      tags:
+        - Quotations
+      parameters:
+        - name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: ^"[1-9][0-9]*"$
+            example: '"3"'
+      responses:
+        "204":
+          description: Soft-deleted; no body
+        "400": *a4
+        "401": *a5
+        "403": *a6
+        "404": *a7
+        "409": *a8
+        "422": *a9
+        "500": *a10
+  /quotations/{id}/submit:
+    parameters:
+      - *a15
+    post:
+      operationId: submitQuotation
+      summary: Draft to PendingApproval
+      description: Requires active buyer with contact (email/phone), billing/shipping addresses, validUntil,
+        requestedDeliveryDate, paymentTerms and positive prices. Captures customer/address/garment snapshots. Commercial
+        fields then freeze.
+      tags:
+        - Quotations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersionAction"
+            example:
+              version: 1
+      responses:
+        "200":
+          description: Draft to PendingApproval
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/QuotationDetail"
+                required:
+                  - data
+              example:
+                data:
+                  id: 80000000-0000-4000-8000-000000000001
+                  familyId: 90000000-0000-4000-8000-000000000001
+                  quoteNumber: QT-2026-0001
+                  revision: 1
+                  status: PendingApproval
+                  customerId: 30000000-0000-4000-8000-000000000001
+                  customerName: Ocean Apparel
+                  salesTeamId: 20000000-0000-4000-8000-000000000001
+                  ownerId: 10000000-0000-4000-8000-000000000001
+                  currency: USD
+                  totalQty: 1000
+                  subtotal: "5500.00"
+                  total: "5500.00"
+                  validUntil: 2026-10-31
+                  requestedDeliveryDate: 2026-11-30
+                  version: 2
+                  createdAt: 2026-10-16T04:00:00.000Z
+                  updatedAt: 2026-10-16T04:00:00.000Z
+                  quotationDate: 2026-10-16
+                  billingAddressId: 40000000-0000-4000-8000-000000000001
+                  shippingAddressId: 40000000-0000-4000-8000-000000000002
+                  paymentTerms: 30% advance; 70% before shipment
+                  notes: "Staff-only: Pack by colour and size"
+                  priorRevisionId: null
+                  customerSnapshot: *a16
+                  billingAddressSnapshot: *a17
+                  shippingAddressSnapshot:
+                    id: 40000000-0000-4000-8000-000000000002
+                    addressType: shipping
+                    line1: 100 Ocean Avenue
+                    line2: null
+                    city: New York
+                    postalCode: "10001"
+                    country: US
+                  draftBuyer: null
+                  lines: *a18
+                  submittedBy: 10000000-0000-4000-8000-000000000001
+                  submittedAt: 2026-10-16T04:00:00.000Z
+                  approvedBy: null
+                  approvedAt: null
+                  issuedAt: null
+                  buyerDecision: null
+                  buyerResponseReference: null
+                  buyerResponseReason: null
+                  buyerResponseAt: null
+                  salesOrderId: null
+                  linkedOrder: null
+                  familyLocked: false
+                  revisions:
+                    - id: 80000000-0000-4000-8000-000000000001
+                      revision: 1
+                      status: PendingApproval
+                      version: 2
+                      priorRevisionId: null
+                  audit:
+                    - id: c0000000-0000-4000-8000-000000000001
+                      actorId: 10000000-0000-4000-8000-000000000001
+                      action: submit
+                      fromStatus: Draft
+                      toStatus: PendingApproval
+                      reason: null
+                      metadata: null
+                      requestId: req-example
+                      createdAt: 2026-10-16T04:00:00.000Z
+                  allowedActions:
+                    - pdf
+                    - reject
+                    - withdraw
+                    - approve
+        "400": *a4
+        "401": *a5
+        "403": *a6
+        "404": *a7
+        "409": *a8
+        "422": *a9
+        "500": *a10
+  /quotations/{id}/approve:
+    parameters:
+      - *a15
+    post:
+      operationId: approveQuotation
+      summary: PendingApproval to Approved
+      description: SalesManager/Admin within scope; approver must differ from submittedBy, including Admin. Rechecks active
+        masters and inclusive local validity.
+      tags:
+        - Quotations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApproveAction"
+            example:
+              version: 2
+              comment: Pricing reviewed
+      responses:
+        "200":
+          description: PendingApproval to Approved
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/QuotationDetail"
+                required:
+                  - data
+              example:
+                data:
+                  id: 80000000-0000-4000-8000-000000000001
+                  familyId: 90000000-0000-4000-8000-000000000001
+                  quoteNumber: QT-2026-0001
+                  revision: 1
+                  status: Approved
+                  customerId: 30000000-0000-4000-8000-000000000001
+                  customerName: Ocean Apparel
+                  salesTeamId: 20000000-0000-4000-8000-000000000001
+                  ownerId: 10000000-0000-4000-8000-000000000001
+                  currency: USD
+                  totalQty: 1000
+                  subtotal: "5500.00"
+                  total: "5500.00"
+                  validUntil: 2026-10-31
+                  requestedDeliveryDate: 2026-11-30
+                  version: 3
+                  createdAt: 2026-10-16T04:00:00.000Z
+                  updatedAt: 2026-10-16T04:00:00.000Z
+                  quotationDate: 2026-10-16
+                  billingAddressId: 40000000-0000-4000-8000-000000000001
+                  shippingAddressId: 40000000-0000-4000-8000-000000000002
+                  paymentTerms: 30% advance; 70% before shipment
+                  notes: "Staff-only: Pack by colour and size"
+                  priorRevisionId: null
+                  customerSnapshot: *a16
+                  billingAddressSnapshot: *a17
+                  shippingAddressSnapshot:
+                    id: 40000000-0000-4000-8000-000000000002
+                    addressType: shipping
+                    line1: 100 Ocean Avenue
+                    line2: null
+                    city: New York
+                    postalCode: "10001"
+                    country: US
+                  draftBuyer: null
+                  lines: *a18
+                  submittedBy: 10000000-0000-4000-8000-000000000001
+                  submittedAt: 2026-10-16T04:00:00.000Z
+                  approvedBy: 10000000-0000-4000-8000-000000000002
+                  approvedAt: 2026-10-16T04:00:00.000Z
+                  issuedAt: null
+                  buyerDecision: null
+                  buyerResponseReference: null
+                  buyerResponseReason: null
+                  buyerResponseAt: null
+                  salesOrderId: null
+                  linkedOrder: null
+                  familyLocked: false
+                  revisions:
+                    - id: 80000000-0000-4000-8000-000000000001
+                      revision: 1
+                      status: Approved
+                      version: 3
+                      priorRevisionId: null
+                  audit:
+                    - id: c0000000-0000-4000-8000-000000000001
+                      actorId: 10000000-0000-4000-8000-000000000002
+                      action: approve
+                      fromStatus: PendingApproval
+                      toStatus: Approved
+                      reason: Pricing reviewed
+                      metadata: null
+                      requestId: req-example
+                      createdAt: 2026-10-16T04:00:00.000Z
+                  allowedActions:
+                    - pdf
+                    - issue
+                    - void
+                    - revisions
+        "400": *a4
+        "401": *a5
+        "403": *a6
+        "404": *a7
+        "409": *a8
+        "422": *a9
+        "500": *a10
+  /quotations/{id}/reject:
+    parameters:
+      - *a15
+    post:
+      operationId: rejectQuotation
+      summary: PendingApproval to Draft
+      description: Manager/Admin only. Requires trimmed reason; clears current submission/approval metadata. Audit remains.
+      tags:
+        - Quotations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReasonAction"
+            example:
+              version: 2
+              reason: Please review unit prices
+      responses:
+        "200":
+          description: PendingApproval to Draft
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/QuotationDetail"
+                required:
+                  - data
+              example:
+                data:
+                  id: 80000000-0000-4000-8000-000000000001
+                  familyId: 90000000-0000-4000-8000-000000000001
+                  quoteNumber: QT-2026-0001
+                  revision: 1
+                  status: Draft
+                  customerId: 30000000-0000-4000-8000-000000000001
+                  customerName: Ocean Apparel
+                  salesTeamId: 20000000-0000-4000-8000-000000000001
+                  ownerId: 10000000-0000-4000-8000-000000000001
+                  currency: USD
+                  totalQty: 1000
+                  subtotal: "5500.00"
+                  total: "5500.00"
+                  validUntil: 2026-10-31
+                  requestedDeliveryDate: 2026-11-30
+                  version: 3
+                  createdAt: 2026-10-16T04:00:00.000Z
+                  updatedAt: 2026-10-16T04:00:00.000Z
+                  quotationDate: 2026-10-16
+                  billingAddressId: 40000000-0000-4000-8000-000000000001
+                  shippingAddressId: 40000000-0000-4000-8000-000000000002
+                  paymentTerms: 30% advance; 70% before shipment
+                  notes: "Staff-only: Pack by colour and size"
+                  priorRevisionId: null
+                  customerSnapshot: null
+                  billingAddressSnapshot: null
+                  shippingAddressSnapshot: null
+                  draftBuyer: *a12
+                  lines: *a18
+                  submittedBy: null
+                  submittedAt: null
+                  approvedBy: null
+                  approvedAt: null
+                  issuedAt: null
+                  buyerDecision: null
+                  buyerResponseReference: null
+                  buyerResponseReason: null
+                  buyerResponseAt: null
+                  salesOrderId: null
+                  linkedOrder: null
+                  familyLocked: false
+                  revisions:
+                    - id: 80000000-0000-4000-8000-000000000001
+                      revision: 1
+                      status: Draft
+                      version: 3
+                      priorRevisionId: null
+                  audit:
+                    - id: c0000000-0000-4000-8000-000000000001
+                      actorId: 10000000-0000-4000-8000-000000000002
+                      action: reject
+                      fromStatus: PendingApproval
+                      toStatus: Draft
+                      reason: Please review unit prices
+                      metadata: null
+                      requestId: req-example
+                      createdAt: 2026-10-16T04:00:00.000Z
+                  allowedActions:
+                    - pdf
+                    - edit
+                    - delete
+                    - submit
+        "400": *a4
+        "401": *a5
+        "403": *a6
+        "404": *a7
+        "409": *a8
+        "422": *a9
+        "500": *a10
+  /quotations/{id}/withdraw:
+    parameters:
+      - *a15
+    post:
+      operationId: withdrawQuotation
+      summary: Withdraw submission to Draft
+      description: Authorized Sales/team member or manager/admin. Clears submission/approval metadata; resubmission recaptures
+        snapshots.
+      tags:
+        - Quotations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReasonAction"
+            example:
+              version: 2
+              reason: Buyer changed quantities
+      responses:
+        "200":
+          description: Withdraw submission to Draft
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/QuotationDetail"
+                required:
+                  - data
+              example:
+                data:
+                  id: 80000000-0000-4000-8000-000000000001
+                  familyId: 90000000-0000-4000-8000-000000000001
+                  quoteNumber: QT-2026-0001
+                  revision: 1
+                  status: Draft
+                  customerId: 30000000-0000-4000-8000-000000000001
+                  customerName: Ocean Apparel
+                  salesTeamId: 20000000-0000-4000-8000-000000000001
+                  ownerId: 10000000-0000-4000-8000-000000000001
+                  currency: USD
+                  totalQty: 1000
+                  subtotal: "5500.00"
+                  total: "5500.00"
+                  validUntil: 2026-10-31
+                  requestedDeliveryDate: 2026-11-30
+                  version: 3
+                  createdAt: 2026-10-16T04:00:00.000Z
+                  updatedAt: 2026-10-16T04:00:00.000Z
+                  quotationDate: 2026-10-16
+                  billingAddressId: 40000000-0000-4000-8000-000000000001
+                  shippingAddressId: 40000000-0000-4000-8000-000000000002
+                  paymentTerms: 30% advance; 70% before shipment
+                  notes: "Staff-only: Pack by colour and size"
+                  priorRevisionId: null
+                  customerSnapshot: null
+                  billingAddressSnapshot: null
+                  shippingAddressSnapshot: null
+                  draftBuyer: *a12
+                  lines: *a18
+                  submittedBy: null
+                  submittedAt: null
+                  approvedBy: null
+                  approvedAt: null
+                  issuedAt: null
+                  buyerDecision: null
+                  buyerResponseReference: null
+                  buyerResponseReason: null
+                  buyerResponseAt: null
+                  salesOrderId: null
+                  linkedOrder: null
+                  familyLocked: false
+                  revisions:
+                    - id: 80000000-0000-4000-8000-000000000001
+                      revision: 1
+                      status: Draft
+                      version: 3
+                      priorRevisionId: null
+                  audit:
+                    - id: c0000000-0000-4000-8000-000000000001
+                      actorId: 10000000-0000-4000-8000-000000000001
+                      action: withdraw
+                      fromStatus: PendingApproval
+                      toStatus: Draft
+                      reason: Buyer changed quantities
+                      metadata: null
+                      requestId: req-example
+                      createdAt: 2026-10-16T04:00:00.000Z
+                  allowedActions:
+                    - pdf
+                    - edit
+                    - delete
+                    - submit
+        "400": *a4
+        "401": *a5
+        "403": *a6
+        "404": *a7
+        "409": *a8
+        "422": *a9
+        "500": *a10
+  /quotations/{id}/issue:
+    parameters:
+      - *a15
+    post:
+      operationId: issueQuotation
+      summary: Approved to Issued
+      description: Rechecks active masters and validity. Atomically supersedes previous active Issued revision and increments
+        its version. Sets active family offer. Records manual channel without sending email.
+      tags:
+        - Quotations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IssueAction"
+            example:
+              version: 3
+              channel: manual
+      responses:
+        "200":
+          description: Approved to Issued
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/QuotationDetail"
+                required:
+                  - data
+              example:
+                data:
+                  id: 80000000-0000-4000-8000-000000000001
+                  familyId: 90000000-0000-4000-8000-000000000001
+                  quoteNumber: QT-2026-0001
+                  revision: 1
+                  status: Issued
+                  customerId: 30000000-0000-4000-8000-000000000001
+                  customerName: Ocean Apparel
+                  salesTeamId: 20000000-0000-4000-8000-000000000001
+                  ownerId: 10000000-0000-4000-8000-000000000001
+                  currency: USD
+                  totalQty: 1000
+                  subtotal: "5500.00"
+                  total: "5500.00"
+                  validUntil: 2026-10-31
+                  requestedDeliveryDate: 2026-11-30
+                  version: 4
+                  createdAt: 2026-10-16T04:00:00.000Z
+                  updatedAt: 2026-10-16T04:00:00.000Z
+                  quotationDate: 2026-10-16
+                  billingAddressId: 40000000-0000-4000-8000-000000000001
+                  shippingAddressId: 40000000-0000-4000-8000-000000000002
+                  paymentTerms: 30% advance; 70% before shipment
+                  notes: "Staff-only: Pack by colour and size"
+                  priorRevisionId: null
+                  customerSnapshot: *a16
+                  billingAddressSnapshot: *a17
+                  shippingAddressSnapshot:
+                    id: 40000000-0000-4000-8000-000000000002
+                    addressType: shipping
+                    line1: 100 Ocean Avenue
+                    line2: null
+                    city: New York
+                    postalCode: "10001"
+                    country: US
+                  draftBuyer: null
+                  lines: *a18
+                  submittedBy: 10000000-0000-4000-8000-000000000001
+                  submittedAt: 2026-10-16T04:00:00.000Z
+                  approvedBy: 10000000-0000-4000-8000-000000000002
+                  approvedAt: 2026-10-16T04:00:00.000Z
+                  issuedAt: 2026-10-16T04:00:00.000Z
+                  buyerDecision: null
+                  buyerResponseReference: null
+                  buyerResponseReason: null
+                  buyerResponseAt: null
+                  salesOrderId: null
+                  linkedOrder: null
+                  familyLocked: false
+                  revisions:
+                    - id: 80000000-0000-4000-8000-000000000001
+                      revision: 1
+                      status: Issued
+                      version: 4
+                      priorRevisionId: null
+                  audit:
+                    - id: c0000000-0000-4000-8000-000000000001
+                      actorId: 10000000-0000-4000-8000-000000000001
+                      action: issue
+                      fromStatus: Approved
+                      toStatus: Issued
+                      reason: null
+                      metadata: null
+                      requestId: req-example
+                      createdAt: 2026-10-16T04:00:00.000Z
+                  allowedActions:
+                    - pdf
+                    - buyer-response
+                    - void
+                    - revisions
+        "400": *a4
+        "401": *a5
+        "403": *a6
+        "404": *a7
+        "409": *a8
+        "422": *a9
+        "500": *a10
+  /quotations/{id}/buyer-response:
+    parameters:
+      - *a15
+    post:
+      operationId: buyerresponseQuotation
+      summary: Record buyer acceptance or decline
+      description: Staff-reported response, not a portal or signature. Only active unexpired Issued offer. Reference required;
+        decline additionally requires reason. Acceptance locks every competing revision; decline clears active offer.
+        Delayed expiry persists independently of a conflict response.
+      tags:
+        - Quotations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BuyerResponse"
+            examples:
+              accepted:
+                value:
+                  version: 4
+                  decision: Accepted
+                  reference: Buyer email dated 2026-10-16
+              declined:
+                value:
+                  version: 4
+                  decision: Declined
+                  reference: Buyer email
+                  reason: Delivery too late
+      responses:
+        "200":
+          description: Record buyer acceptance or decline
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/QuotationDetail"
+                required:
+                  - data
+              example:
+                data:
+                  id: 80000000-0000-4000-8000-000000000001
+                  familyId: 90000000-0000-4000-8000-000000000001
+                  quoteNumber: QT-2026-0001
+                  revision: 1
+                  status: Accepted
+                  customerId: 30000000-0000-4000-8000-000000000001
+                  customerName: Ocean Apparel
+                  salesTeamId: 20000000-0000-4000-8000-000000000001
+                  ownerId: 10000000-0000-4000-8000-000000000001
+                  currency: USD
+                  totalQty: 1000
+                  subtotal: "5500.00"
+                  total: "5500.00"
+                  validUntil: 2026-10-31
+                  requestedDeliveryDate: 2026-11-30
+                  version: 5
+                  createdAt: 2026-10-16T04:00:00.000Z
+                  updatedAt: 2026-10-16T04:00:00.000Z
+                  quotationDate: 2026-10-16
+                  billingAddressId: 40000000-0000-4000-8000-000000000001
+                  shippingAddressId: 40000000-0000-4000-8000-000000000002
+                  paymentTerms: 30% advance; 70% before shipment
+                  notes: "Staff-only: Pack by colour and size"
+                  priorRevisionId: null
+                  customerSnapshot: *a16
+                  billingAddressSnapshot: *a17
+                  shippingAddressSnapshot:
+                    id: 40000000-0000-4000-8000-000000000002
+                    addressType: shipping
+                    line1: 100 Ocean Avenue
+                    line2: null
+                    city: New York
+                    postalCode: "10001"
+                    country: US
+                  draftBuyer: null
+                  lines: *a18
+                  submittedBy: 10000000-0000-4000-8000-000000000001
+                  submittedAt: 2026-10-16T04:00:00.000Z
+                  approvedBy: 10000000-0000-4000-8000-000000000002
+                  approvedAt: 2026-10-16T04:00:00.000Z
+                  issuedAt: 2026-10-16T04:00:00.000Z
+                  buyerDecision: Accepted
+                  buyerResponseReference: Buyer email dated 2026-10-16
+                  buyerResponseReason: null
+                  buyerResponseAt: 2026-10-16T04:00:00.000Z
+                  salesOrderId: null
+                  linkedOrder: null
+                  familyLocked: true
+                  revisions:
+                    - id: 80000000-0000-4000-8000-000000000001
+                      revision: 1
+                      status: Accepted
+                      version: 5
+                      priorRevisionId: null
+                  audit:
+                    - id: c0000000-0000-4000-8000-000000000001
+                      actorId: 10000000-0000-4000-8000-000000000001
+                      action: buyer-response
+                      fromStatus: Issued
+                      toStatus: Accepted
+                      reason: null
+                      metadata: null
+                      requestId: req-example
+                      createdAt: 2026-10-16T04:00:00.000Z
+                  allowedActions:
+                    - pdf
+                    - convert
+        "400": *a4
+        "401": *a5
+        "403": *a6
+        "404": *a7
+        "409": *a8
+        "422": *a9
+        "500": *a10
+  /quotations/{id}/revisions:
+    parameters:
+      - *a15
+    post:
+      operationId: revisionsQuotation
+      summary: Create a separate replacement Draft
+      description: Source must be latest nondeleted Approved/Issued/Declined/Expired revision. Family must be unlocked and
+        have no working successor. Same quote number, new ID and higher revision; old offer remains valid until
+        replacement issue. Validity is copied without extension.
+      tags:
+        - Quotations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReasonAction"
+            example:
+              version: 4
+              reason: Buyer requested updated quantity
+      responses:
+        "201":
+          description: Create a separate replacement Draft
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/QuotationDetail"
+                required:
+                  - data
+              example:
+                data:
+                  id: 80000000-0000-4000-8000-000000000002
+                  familyId: 90000000-0000-4000-8000-000000000001
+                  quoteNumber: QT-2026-0001
+                  revision: 2
+                  status: Draft
+                  customerId: 30000000-0000-4000-8000-000000000001
+                  customerName: Ocean Apparel
+                  salesTeamId: 20000000-0000-4000-8000-000000000001
+                  ownerId: 10000000-0000-4000-8000-000000000001
+                  currency: USD
+                  totalQty: 1000
+                  subtotal: "5500.00"
+                  total: "5500.00"
+                  validUntil: 2026-10-31
+                  requestedDeliveryDate: 2026-11-30
+                  version: 1
+                  createdAt: 2026-10-16T04:00:00.000Z
+                  updatedAt: 2026-10-16T04:00:00.000Z
+                  quotationDate: 2026-10-16
+                  billingAddressId: 40000000-0000-4000-8000-000000000001
+                  shippingAddressId: 40000000-0000-4000-8000-000000000002
+                  paymentTerms: 30% advance; 70% before shipment
+                  notes: "Staff-only: Pack by colour and size"
+                  priorRevisionId: 80000000-0000-4000-8000-000000000001
+                  customerSnapshot: null
+                  billingAddressSnapshot: null
+                  shippingAddressSnapshot: null
+                  draftBuyer: *a12
+                  lines: *a18
+                  submittedBy: null
+                  submittedAt: null
+                  approvedBy: null
+                  approvedAt: null
+                  issuedAt: null
+                  buyerDecision: null
+                  buyerResponseReference: null
+                  buyerResponseReason: null
+                  buyerResponseAt: null
+                  salesOrderId: null
+                  linkedOrder: null
+                  familyLocked: false
+                  revisions:
+                    - id: 80000000-0000-4000-8000-000000000002
+                      revision: 2
+                      status: Draft
+                      version: 1
+                      priorRevisionId: 80000000-0000-4000-8000-000000000001
+                    - id: 80000000-0000-4000-8000-000000000001
+                      revision: 1
+                      status: Issued
+                      version: 4
+                      priorRevisionId: null
+                  audit:
+                    - id: c0000000-0000-4000-8000-000000000001
+                      actorId: 10000000-0000-4000-8000-000000000001
+                      action: create_revision
+                      fromStatus: null
+                      toStatus: Draft
+                      reason: Buyer requested updated quantity
+                      metadata: null
+                      requestId: req-example
+                      createdAt: 2026-10-16T04:00:00.000Z
+                  allowedActions:
+                    - pdf
+                    - edit
+                    - delete
+                    - submit
+        "400": *a4
+        "401": *a5
+        "403": *a6
+        "404": *a7
+        "409": *a8
+        "422": *a9
+        "500": *a10
+  /quotations/{id}/void:
+    parameters:
+      - *a15
+    post:
+      operationId: voidQuotation
+      summary: Approved or Issued to Cancelled
+      description: Manager/Admin only, unlocked family. Clears active offer when appropriate. Does not affect any sales order.
+      tags:
+        - Quotations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReasonAction"
+            example:
+              version: 4
+              reason: Offer withdrawn
+      responses:
+        "200":
+          description: Approved or Issued to Cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/QuotationDetail"
+                required:
+                  - data
+              example:
+                data:
+                  id: 80000000-0000-4000-8000-000000000001
+                  familyId: 90000000-0000-4000-8000-000000000001
+                  quoteNumber: QT-2026-0001
+                  revision: 1
+                  status: Cancelled
+                  customerId: 30000000-0000-4000-8000-000000000001
+                  customerName: Ocean Apparel
+                  salesTeamId: 20000000-0000-4000-8000-000000000001
+                  ownerId: 10000000-0000-4000-8000-000000000001
+                  currency: USD
+                  totalQty: 1000
+                  subtotal: "5500.00"
+                  total: "5500.00"
+                  validUntil: 2026-10-31
+                  requestedDeliveryDate: 2026-11-30
+                  version: 5
+                  createdAt: 2026-10-16T04:00:00.000Z
+                  updatedAt: 2026-10-16T04:00:00.000Z
+                  quotationDate: 2026-10-16
+                  billingAddressId: 40000000-0000-4000-8000-000000000001
+                  shippingAddressId: 40000000-0000-4000-8000-000000000002
+                  paymentTerms: 30% advance; 70% before shipment
+                  notes: "Staff-only: Pack by colour and size"
+                  priorRevisionId: null
+                  customerSnapshot: *a16
+                  billingAddressSnapshot: *a17
+                  shippingAddressSnapshot:
+                    id: 40000000-0000-4000-8000-000000000002
+                    addressType: shipping
+                    line1: 100 Ocean Avenue
+                    line2: null
+                    city: New York
+                    postalCode: "10001"
+                    country: US
+                  draftBuyer: null
+                  lines: *a18
+                  submittedBy: 10000000-0000-4000-8000-000000000001
+                  submittedAt: 2026-10-16T04:00:00.000Z
+                  approvedBy: 10000000-0000-4000-8000-000000000002
+                  approvedAt: 2026-10-16T04:00:00.000Z
+                  issuedAt: null
+                  buyerDecision: null
+                  buyerResponseReference: null
+                  buyerResponseReason: null
+                  buyerResponseAt: null
+                  salesOrderId: null
+                  linkedOrder: null
+                  familyLocked: false
+                  revisions:
+                    - id: 80000000-0000-4000-8000-000000000001
+                      revision: 1
+                      status: Cancelled
+                      version: 5
+                      priorRevisionId: null
+                  audit:
+                    - id: c0000000-0000-4000-8000-000000000001
+                      actorId: 10000000-0000-4000-8000-000000000002
+                      action: void
+                      fromStatus: Approved
+                      toStatus: Cancelled
+                      reason: Offer withdrawn
+                      metadata: null
+                      requestId: req-example
+                      createdAt: 2026-10-16T04:00:00.000Z
+                  allowedActions:
+                    - pdf
+        "400": *a4
+        "401": *a5
+        "403": *a6
+        "404": *a7
+        "409": *a8
+        "422": *a9
+        "500": *a10
+  /quotations/{id}/pdf:
+    parameters:
+      - *a15
+    get:
+      operationId: downloadQuotationPdf
+      summary: Download quotation PDF
+      description: Uses current draft buyer/garments for Draft and immutable stored snapshots otherwise. Includes seller,
+        revision/status, addresses, dates, terms, fabric/GSM, colour/size, quantities, prices and totals. Watermarks
+        nonissued states and labels Accepted/Converted. Staff-only notes are excluded. Generation never changes status.
+      tags:
+        - Quotations
+      responses:
+        "200":
+          description: Binary PDF attachment
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              example: attachment; filename="QT-2026-0001-R1.pdf"
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "400": *a4
+        "401": *a5
+        "403": *a6
+        "404": *a7
+        "409": *a8
+        "422": *a9
+        "500": *a10
+  /quotations/{id}/convert:
+    parameters:
+      - *a15
+    post:
+      operationId: convertQuotation
+      summary: Convert accepted revision to one Draft order
+      description: Requires Idempotency-Key. Locks reservation then family/revision, validates accepted link and active
+        buyer/team/owner, and copies accepted snapshots/lines exactly. Acceptance remains convertible after validUntil.
+        First success 201; identical key/payload replays saved status/body. Reused key/different payload 409. New key on
+        an existing conversion returns linked identity with 200 before stale-version checks, including deleted/archived
+        state. No production, shipping, invoice or payment is started.
+      tags:
+        - Quotations
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            maxLength: 128
+            minLength: 1
+          example: d0000000-0000-4000-8000-000000000001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersionAction"
+            example:
+              version: 5
+      responses:
+        "200":
+          description: Existing linked order with a new key (may be archived), or replay of a saved 200
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/SalesOrderSummary"
+                required:
+                  - data
+              example:
+                data:
+                  id: a0000000-0000-4000-8000-000000000001
+                  salesOrderId: a0000000-0000-4000-8000-000000000001
+                  orderNumber: SO-2026-0001
+                  status: Draft
+                  sourceQuotationId: 80000000-0000-4000-8000-000000000001
+                  sourceQuoteNumber: QT-2026-0001
+                  sourceRevision: 1
+                  currency: USD
+                  totalQty: 1000
+                  subtotal: "5500.00"
+                  total: "5500.00"
+                  version: 1
+                  deletedAt: 2026-11-01T00:00:00.000Z
+                  archived: true
+        "201":
+          description: Created Draft sales order, or replay of the original 201
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/SalesOrderSummary"
+                required:
+                  - data
+              example:
+                data:
+                  id: a0000000-0000-4000-8000-000000000001
+                  salesOrderId: a0000000-0000-4000-8000-000000000001
+                  orderNumber: SO-2026-0001
+                  status: Draft
+                  sourceQuotationId: 80000000-0000-4000-8000-000000000001
+                  sourceQuoteNumber: QT-2026-0001
+                  sourceRevision: 1
+                  currency: USD
+                  totalQty: 1000
+                  subtotal: "5500.00"
+                  total: "5500.00"
+                  version: 1
+                  deletedAt: null
+                  archived: false
+        "400": *a4
+        "401": *a5
+        "403": *a6
+        "404": *a7
+        "409": *a8
+        "422": *a9
+        "500": *a10
+components:
+  schemas:
+    LineInput:
+      type: object
+      additionalProperties: false
+      properties:
+        styleId: *a1
+        colour:
+          type: string
+          maxLength: 60
+          minLength: 1
+        size:
+          type: string
+          maxLength: 30
+          minLength: 1
+        qty:
+          type: integer
+          minimum: 1
+          maximum: 1000000
+        unitPrice:
+          type: string
+          pattern: ^(?:0|[1-9]\d{0,7})(?:\.\d{1,2})?$
+          example: "5.50"
+      required:
+        - styleId
+        - colour
+        - size
+        - qty
+        - unitPrice
+    CreateQuotation:
+      type: object
+      additionalProperties: false
+      properties:
+        customerId: *a1
+        salesTeamId: *a1
+        ownerId: *a1
+        currency: &a23
+          type: string
+          maxLength: 3
+          enum:
+            - USD
+            - LKR
+            - GBP
+            - EUR
+        quotationDate: *a2
+        validUntil: &a24
+          type: string
+          format: date
+          nullable: true
+        requestedDeliveryDate: &a25
+          type: string
+          format: date
+          nullable: true
+        billingAddressId: &a26
+          type: string
+          format: uuid
+          nullable: true
+        shippingAddressId: &a27
+          type: string
+          format: uuid
+          nullable: true
+        paymentTerms: &a28
+          type: string
+          maxLength: 500
+          minLength: 1
+          nullable: true
+        notes: &a29
+          type: string
+          maxLength: 10000
+          nullable: true
+        lines: &a30
+          type: array
+          items:
+            $ref: "#/components/schemas/LineInput"
+          minItems: 1
+          maxItems: 500
+      required:
+        - customerId
+        - salesTeamId
+        - ownerId
+        - currency
+        - quotationDate
+        - lines
+    VersionAction:
+      type: object
+      additionalProperties: false
+      properties:
+        version:
+          type: integer
+          minimum: 1
+          maximum: 4294967295
+      required:
+        - version
+    ReasonAction:
+      type: object
+      additionalProperties: false
+      properties:
+        version: *a3
+        reason:
+          type: string
+          maxLength: 1000
+          minLength: 1
+      required:
+        - version
+        - reason
+    ApproveAction:
+      type: object
+      additionalProperties: false
+      properties:
+        version: *a3
+        comment:
+          type: string
+          maxLength: 1000
+          minLength: 1
+      required:
+        - version
+    IssueAction:
+      type: object
+      additionalProperties: false
+      properties:
+        version: *a3
+        channel:
+          type: string
+          enum:
+            - manual
+      required:
+        - version
+        - channel
+    BuyerResponse:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          properties:
+            version: *a3
+            decision:
+              type: string
+              enum:
+                - Accepted
+            reference:
+              type: string
+              maxLength: 500
+              minLength: 1
+          required:
+            - version
+            - decision
+            - reference
+        - type: object
+          additionalProperties: false
+          properties:
+            version: *a3
+            decision:
+              type: string
+              enum:
+                - Declined
+            reference:
+              type: string
+              maxLength: 500
+              minLength: 1
+            reason:
+              type: string
+              maxLength: 1000
+              minLength: 1
+          required:
+            - version
+            - decision
+            - reference
+            - reason
+      discriminator:
+        propertyName: decision
+    Contact:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *a1
+        name:
+          type: string
+          maxLength: 150
+        email:
+          type: string
+          maxLength: 254
+          nullable: true
+        phone:
+          type: string
+          maxLength: 40
+          nullable: true
+        isPrimary:
+          type: boolean
+      required:
+        - id
+        - name
+        - email
+        - phone
+        - isPrimary
+    Buyer:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *a1
+        code:
+          type: string
+          maxLength: 30
+        name:
+          type: string
+          maxLength: 200
+        country:
+          type: string
+          maxLength: 2
+        currency:
+          type: string
+          maxLength: 3
+        contacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Contact"
+      required:
+        - id
+        - code
+        - name
+        - country
+        - currency
+        - contacts
+    Address:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *a1
+        addressType:
+          type: string
+          maxLength: 20
+          enum:
+            - billing
+            - shipping
+        line1:
+          type: string
+          maxLength: 200
+        line2:
+          type: string
+          maxLength: 200
+          nullable: true
+        city:
+          type: string
+          maxLength: 100
+        postalCode:
+          type: string
+          maxLength: 30
+          nullable: true
+        country:
+          type: string
+          maxLength: 2
+      required:
+        - id
+        - addressType
+        - line1
+        - line2
+        - city
+        - postalCode
+        - country
+    QuotationSummary:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *a1
+        familyId: *a1
+        quoteNumber: &a31
+          type: string
+          maxLength: 40
+        revision: *a3
+        status: *a19
+        customerId: *a1
+        customerName: &a32
+          type: string
+          maxLength: 200
+        salesTeamId: *a1
+        ownerId: *a1
+        currency: &a33
+          type: string
+          maxLength: 3
+        totalQty: &a34
+          type: integer
+          minimum: 0
+          maximum: 500000000
+        subtotal: &a20
+          type: string
+          pattern: ^\d+\.\d{2}$
+          example: "5500.00"
+        total: *a20
+        validUntil: &a35
+          type: string
+          format: date
+          nullable: true
+        requestedDeliveryDate: &a36
+          type: string
+          format: date
+          nullable: true
+        version: *a3
+        createdAt: &a21
+          type: string
+          format: date-time
+        updatedAt: *a21
+      required:
+        - id
+        - familyId
+        - quoteNumber
+        - revision
+        - status
+        - customerId
+        - customerName
+        - salesTeamId
+        - ownerId
+        - currency
+        - totalQty
+        - subtotal
+        - total
+        - validUntil
+        - requestedDeliveryDate
+        - version
+        - createdAt
+        - updatedAt
+    QuotationLine:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *a1
+        lineNo: *a3
+        variantId: *a1
+        styleId: *a1
+        styleCode:
+          type: string
+          maxLength: 40
+        styleName:
+          type: string
+          maxLength: 150
+        fabric:
+          type: string
+          maxLength: 250
+        gsm:
+          type: integer
+          minimum: 0
+          nullable: true
+        colour:
+          type: string
+          maxLength: 60
+        size:
+          type: string
+          maxLength: 30
+        uom:
+          type: string
+          enum:
+            - PCS
+        qty:
+          type: integer
+          minimum: 1
+          maximum: 1000000
+        unitPrice: *a20
+        lineTotal: *a20
+      required:
+        - id
+        - lineNo
+        - variantId
+        - styleId
+        - styleCode
+        - styleName
+        - fabric
+        - gsm
+        - colour
+        - size
+        - uom
+        - qty
+        - unitPrice
+        - lineTotal
+    Revision:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *a1
+        revision: *a3
+        status: *a19
+        version: *a3
+        priorRevisionId:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+        - id
+        - revision
+        - status
+        - version
+        - priorRevisionId
+    Audit:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *a1
+        actorId:
+          type: string
+          format: uuid
+          nullable: true
+        action:
+          type: string
+          maxLength: 50
+        fromStatus:
+          type: string
+          enum: *a22
+          nullable: true
+        toStatus:
+          type: string
+          enum: *a22
+          nullable: true
+        reason:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          nullable: true
+          additionalProperties: true
+        requestId:
+          type: string
+          maxLength: 100
+          nullable: true
+        createdAt: *a21
+      required:
+        - id
+        - actorId
+        - action
+        - fromStatus
+        - toStatus
+        - reason
+        - metadata
+        - requestId
+        - createdAt
+    SalesOrderSummary:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *a1
+        salesOrderId: *a1
+        orderNumber:
+          type: string
+          maxLength: 40
+        status:
+          type: string
+          enum:
+            - Draft
+        sourceQuotationId: *a1
+        sourceQuoteNumber:
+          type: string
+          maxLength: 40
+        sourceRevision: *a3
+        currency:
+          type: string
+          maxLength: 3
+        totalQty:
+          type: integer
+        subtotal: *a20
+        total: *a20
+        version: *a3
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+        archived:
+          type: boolean
+      required:
+        - id
+        - salesOrderId
+        - orderNumber
+        - status
+        - sourceQuotationId
+        - sourceQuoteNumber
+        - sourceRevision
+        - currency
+        - totalQty
+        - subtotal
+        - total
+        - version
+        - deletedAt
+        - archived
+    Error:
+      type: object
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            fields:
+              type: object
+              additionalProperties:
+                type: string
+            requestId:
+              type: string
+              maxLength: 100
+          required:
+            - code
+            - message
+            - requestId
+      required:
+        - error
+    PatchQuotation:
+      type: object
+      additionalProperties: false
+      properties:
+        customerId: *a1
+        salesTeamId: *a1
+        ownerId: *a1
+        currency: *a23
+        quotationDate: *a2
+        validUntil: *a24
+        requestedDeliveryDate: *a25
+        billingAddressId: *a26
+        shippingAddressId: *a27
+        paymentTerms: *a28
+        notes: *a29
+        lines: *a30
+        version:
+          type: integer
+          minimum: 1
+          maximum: 4294967295
+      required:
+        - version
+      minProperties: 2
+      description: Only supplied fields change. lines atomically replaces the whole nonempty collection; line IDs may change.
+        Protected/unknown fields are rejected.
+    QuotationDetail:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *a1
+        familyId: *a1
+        quoteNumber: *a31
+        revision: *a3
+        status: *a19
+        customerId: *a1
+        customerName: *a32
+        salesTeamId: *a1
+        ownerId: *a1
+        currency: *a33
+        totalQty: *a34
+        subtotal: *a20
+        total: *a20
+        validUntil: *a35
+        requestedDeliveryDate: *a36
+        version: *a3
+        createdAt: *a21
+        updatedAt: *a21
+        quotationDate: *a2
+        billingAddressId:
+          type: string
+          format: uuid
+          nullable: true
+        shippingAddressId:
+          type: string
+          format: uuid
+          nullable: true
+        paymentTerms:
+          type: string
+          maxLength: 500
+          nullable: true
+        notes:
+          type: string
+          maxLength: 10000
+          description: Staff-only notes; excluded from PDF.
+          nullable: true
+        priorRevisionId:
+          type: string
+          format: uuid
+          nullable: true
+        customerSnapshot:
+          type: object
+          allOf:
+            - $ref: "#/components/schemas/Buyer"
+          nullable: true
+        billingAddressSnapshot:
+          type: object
+          allOf:
+            - $ref: "#/components/schemas/Address"
+          nullable: true
+        shippingAddressSnapshot:
+          type: object
+          allOf:
+            - $ref: "#/components/schemas/Address"
+          nullable: true
+        draftBuyer:
+          type: object
+          additionalProperties: false
+          properties:
+            customer:
+              $ref: "#/components/schemas/Buyer"
+            billingAddress:
+              type: object
+              allOf:
+                - $ref: "#/components/schemas/Address"
+              nullable: true
+            shippingAddress:
+              type: object
+              allOf:
+                - $ref: "#/components/schemas/Address"
+              nullable: true
+          required:
+            - customer
+            - billingAddress
+            - shippingAddress
+          nullable: true
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuotationLine"
+        submittedBy:
+          type: string
+          format: uuid
+          nullable: true
+        submittedAt:
+          type: string
+          format: date-time
+          nullable: true
+        approvedBy:
+          type: string
+          format: uuid
+          nullable: true
+        approvedAt:
+          type: string
+          format: date-time
+          nullable: true
+        issuedAt:
+          type: string
+          format: date-time
+          nullable: true
+        buyerDecision:
+          type: string
+          enum:
+            - Accepted
+            - Declined
+          nullable: true
+        buyerResponseReference:
+          type: string
+          maxLength: 500
+          nullable: true
+        buyerResponseReason:
+          type: string
+          maxLength: 1000
+          nullable: true
+        buyerResponseAt:
+          type: string
+          format: date-time
+          nullable: true
+        salesOrderId:
+          type: string
+          format: uuid
+          nullable: true
+        linkedOrder:
+          type: object
+          allOf:
+            - $ref: "#/components/schemas/SalesOrderSummary"
+          nullable: true
+        familyLocked:
+          type: boolean
+        revisions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Revision"
+        audit:
+          type: array
+          items:
+            $ref: "#/components/schemas/Audit"
+        allowedActions:
+          type: array
+          items:
+            type: string
+            enum:
+              - pdf
+              - edit
+              - delete
+              - submit
+              - approve
+              - reject
+              - withdraw
+              - issue
+              - buyer-response
+              - revisions
+              - void
+              - convert
+      required:
+        - id
+        - familyId
+        - quoteNumber
+        - revision
+        - status
+        - customerId
+        - customerName
+        - salesTeamId
+        - ownerId
+        - currency
+        - totalQty
+        - subtotal
+        - total
+        - validUntil
+        - requestedDeliveryDate
+        - version
+        - createdAt
+        - updatedAt
+        - quotationDate
+        - billingAddressId
+        - shippingAddressId
+        - paymentTerms
+        - notes
+        - priorRevisionId
+        - customerSnapshot
+        - billingAddressSnapshot
+        - shippingAddressSnapshot
+        - draftBuyer
+        - lines
+        - submittedBy
+        - submittedAt
+        - approvedBy
+        - approvedAt
+        - issuedAt
+        - buyerDecision
+        - buyerResponseReference
+        - buyerResponseReason
+        - buyerResponseAt
+        - salesOrderId
+        - linkedOrder
+        - familyLocked
+        - revisions
+        - audit
+        - allowedActions
