@@ -1,3 +1,8 @@
+import { salesTeamRoutes } from "./modules/sales-teams/sales-team.routes.js";
+import {
+  assignmentRoutes,
+  directoryRoutes,
+} from "./shared/assignments/assignment.routes.js";
 import { customerRoutes } from "./modules/customers/customer.routes.js";
 import { salesOrderRoutes } from "./modules/sales-orders/sales-order.routes.js";
 import { randomUUID } from "node:crypto";
@@ -37,6 +42,9 @@ export function createApp({
   app.use("/api/v1/reference-data", referenceDataRoutes(context));
   app.use("/api/v1/sales-orders", salesOrderRoutes(context.salesOrders));
   app.use("/api/v1/customers", customerRoutes(context.customers));
+  app.use("/api/v1/sales-teams", salesTeamRoutes(context.salesTeams));
+  app.use("/api/v1/assignments", assignmentRoutes(context.assignments));
+  app.use("/api/v1/users", directoryRoutes(context.salesTeams));
   app.locals.quotations = context;
 
   app.get("/api/health", (_request, response) => {

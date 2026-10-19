@@ -24,7 +24,10 @@
     "docs:orders": "node scripts/generate-sales-orders-openapi.js",
     "seed:customers": "node src/db/seeders/customers-demo.js",
     "docs:customers": "node scripts/generate-customers-openapi.js",
-    "demo:customers": "node scripts/customers-demo.js"
+    "demo:customers": "node scripts/customers-demo.js",
+    "seed:teams": "node src/db/seeders/sales-teams-demo.js",
+    "docs:teams": "node scripts/generate-sales-teams-openapi.js",
+    "demo:teams": "node scripts/sales-teams-demo.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

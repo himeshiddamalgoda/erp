@@ -138,3 +138,7 @@ Create/confirm/amendment retain the original key and body for uncertain-outcome 
 ## Customers
 
 Customers list/create/profile/edit screens are available under **Orders → Customers**. All six Customers APIs are integrated, including nested contacts/addresses, archive/reactivate reason dialogs, scoped commercial history, blocker recovery, create idempotency and version conflicts. See [screen/API journeys and test setup](docs/customers-journeys.md). Add `NEXT_PUBLIC_ADMIN_API_URL=http://localhost:4102` with development workspaces enabled and run an Admin backend on4102 for local master-data writes. Sales/manager customer access stays read-only. Production uses its authenticated backend principal.
+
+## Sales teams
+
+Sales Teams list/create/profile/edit screens are available under **Orders → Sales teams**. They integrate all six team APIs, existing staff lookup and explicit assignment transfers. Profile tabs show customers, every quotation revision and sales orders; membership history, blocker recovery, archive/reactivate, stale versions and durable create retries are supported. See [screen/API mapping and testing journeys](docs/sales-teams-journeys.md). Use the development Admin workspace for team management; production uses backend capabilities and current team scope.

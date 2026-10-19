@@ -8,7 +8,8 @@ export function referenceDataRoutes(context) {
   const router = Router();
   router.use(authContext);
   router.get("/quotation-options", async (req, res) => {
-    const { user, ...options } = await loadQuotationOptions(context, req.user);
+    const { user, resolvedSalesTeamIds, ...options } =
+      await loadQuotationOptions(context, req.user);
     if (!user?.isActive)
       throw new AppError(
         401,
@@ -21,10 +22,15 @@ export function referenceDataRoutes(context) {
           id: user.id,
           displayName: user.displayName,
           role: req.user.role,
-          salesTeamIds: req.user.salesTeamIds,
+          salesTeamIds: resolvedSalesTeamIds,
           capabilities: Array.isArray(req.user.capabilities)
             ? req.user.capabilities.filter((c) =>
-                ["customers:write", "customers:assign"].includes(c),
+                [
+                  "customers:write",
+                  "customers:assign",
+                  "sales-teams:write",
+                  "assignments:write",
+                ].includes(c),
               )
             : [],
         },

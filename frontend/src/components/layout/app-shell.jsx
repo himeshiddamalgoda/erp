@@ -58,17 +58,22 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const isSalesOrders = pathname.startsWith(ROUTES.salesOrders);
+  const isTeams = pathname.startsWith(ROUTES.salesTeams);
   const isCustomers = pathname.startsWith(ROUTES.customers);
-  const section = isCustomers
-    ? "Customers"
-    : isSalesOrders
-      ? "Sales orders"
-      : "Quotations";
-  const sectionHref = isCustomers
-    ? ROUTES.customers
-    : isSalesOrders
-      ? ROUTES.salesOrders
-      : ROUTES.quotations;
+  const section = isTeams
+    ? "Sales teams"
+    : isCustomers
+      ? "Customers"
+      : isSalesOrders
+        ? "Sales orders"
+        : "Quotations";
+  const sectionHref = isTeams
+    ? ROUTES.salesTeams
+    : isCustomers
+      ? ROUTES.customers
+      : isSalesOrders
+        ? ROUTES.salesOrders
+        : ROUTES.quotations;
   breadcrumb = breadcrumb || section;
   const [pendingNavigation, setPendingNavigation] = useState(null);
   const navigate = (event) => {
@@ -138,13 +143,15 @@ export function AppShell({
               pathname.startsWith(ROUTES.quotations) ? "page" : undefined
             }
             className={
-              isSalesOrders || isCustomers ? styles.navLink : styles.navActive
+              isSalesOrders || isCustomers || isTeams
+                ? styles.navLink
+                : styles.navActive
             }
             onClick={navigate}
           >
             <FileText size={16} />
             <span>Quotations</span>
-            {!isSalesOrders && !isCustomers && (
+            {!isSalesOrders && !isCustomers && !isTeams && (
               <span className={styles.activeIndicator} />
             )}
           </Link>
@@ -167,6 +174,16 @@ export function AppShell({
             <Users size={16} />
             <span>Customers</span>
             {isCustomers && <span className={styles.activeIndicator} />}
+          </Link>
+          <Link
+            href={ROUTES.salesTeams}
+            onClick={navigate}
+            className={isTeams ? styles.navActive : styles.navLink}
+            aria-current={isTeams ? "page" : undefined}
+          >
+            <Users size={16} />
+            <span>Sales teams</span>
+            {isTeams && <span className={styles.activeIndicator} />}
           </Link>
         </div>
       </Collapse>
@@ -292,7 +309,11 @@ export function AppShell({
         onClose={() => setPendingNavigation(null)}
       >
         <DialogTitle>
-          {isCustomers ? "Leave this customer form?" : "Leave this draft?"}
+          {isTeams
+            ? "Leave this team form?"
+            : isCustomers
+              ? "Leave this customer form?"
+              : "Leave this draft?"}
         </DialogTitle>
         <DialogContent>
           Your unsaved changes will be lost. Save before leaving if you want to

@@ -1,0 +1,685 @@
+openapi: 3.0.3
+info:
+  title: Garment ERP Team Supporting Dependencies
+  version: 1.0.0
+  description: Separate from the six team routes. Existing staff lookup and one-record operational
+    reassignment; no account administration.
+servers:
+  - url: http://127.0.0.1:4102/api/v1
+    description: Local Admin development instance; fixed actor configured server-side, prohibited in production
+paths:
+  /users:
+    get:
+      operationId: listAssignableStaff
+      summary: Minimal eligible active staff lookup
+      description: Requires Admin/team-management capability or assignment capability. Principals with
+        team-management capability see all eligible staff; assignment-only principals see active
+        membership users within their current scopes. No email, secrets or login fields. Supports
+        display-name literal search; pageSize max100.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - Active
+            default: Active
+          description: Active only
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 100
+            minLength: 1
+          description: Literal display-name substring
+        - name: managerEligible
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Filter manager-role eligibility
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000000
+            default: 1
+          description: Page
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Page size
+      responses:
+        "200":
+          description: Eligible directory
+          headers:
+            X-Request-Id:
+              schema: &a1
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffList"
+              example:
+                data:
+                  - id: 10000000-0000-4000-8000-000000000002
+                    displayName: Demo SalesManager
+                    role: SalesManager
+                    managerEligible: true
+                meta:
+                  page: 1
+                  pageSize: 20
+                  total: 1
+        "400": &a2
+          description: Malformed query/path/header, JSON or invalid Idempotency-Key
+          headers:
+            X-Request-Id:
+              schema: *a1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401": &a3
+          description: Invalid/inactive principal or stale role claim
+          headers:
+            X-Request-Id:
+              schema: *a1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403": &a4
+          description: Missing management/assignment capability
+          headers:
+            X-Request-Id:
+              schema: *a1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404": &a5
+          description: Missing or outside current live scope
+          headers:
+            X-Request-Id:
+              schema: *a1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409": &a6
+          description: STALE_VERSION, INVALID_TRANSITION, ownership blockers, key reuse or constraint conflict
+          headers:
+            X-Request-Id:
+              schema: *a1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413": &a7
+          description: JSON body exceeds1MB
+          headers:
+            X-Request-Id:
+              schema: *a1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422": &a8
+          description: VALIDATION_ERROR, INVALID_MANAGER, INVALID_MEMBER or MANAGER_MUST_BE_MEMBER
+          headers:
+            X-Request-Id:
+              schema: *a1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": &a9
+          description: Sanitized unexpected failure
+          headers:
+            X-Request-Id:
+              schema: *a1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /assignments/reassign:
+    post:
+      operationId: reassignCommercialRecord
+      summary: Reassign one existing customer/open document
+      description: Entity version, reason, active target team/member required. Admin global; customer
+        transfer needs customers:write + customers:assign; document transfer needs
+        assignments:write. Non-Admins need live source AND target scopes. Customer delegates to the
+        existing aggregate PATCH ownership service. Open quotes/orders update operational
+        ownership/version/audit only. Terminal documents reject. Sorted team locks after
+        entity/family and customer guards. Existing-ownership repair permits unrelated stale
+        ordinary members while still validating target manager/owner; new commercial creation stays
+        blocked until team repair.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReassignmentInput"
+            example:
+              entityType: quotation
+              entityId: 80000000-0000-4000-8000-000000000001
+              salesTeamId: 20000000-0000-4000-8000-000000000002
+              ownerId: 10000000-0000-4000-8000-000000000005
+              version: 6
+              reason: Reassigned before member removal
+      responses:
+        "200":
+          description: Updated entity; no-op keeps entity version
+          headers:
+            X-Request-Id:
+              schema: *a1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReassignmentResult"
+        "400": *a2
+        "401": *a3
+        "403": *a4
+        "404": *a5
+        "409": *a6
+        "413": *a7
+        "422": *a8
+        "500": *a9
+components:
+  schemas:
+    TeamCreateInput:
+      type: object
+      additionalProperties: false
+      properties:
+        name: &a10
+          type: string
+          maxLength: 150
+          minLength: 2
+        description: &a11
+          type: string
+          maxLength: 1000
+          nullable: true
+        managerId: *a1
+        memberIds: &a12
+          type: array
+          items: *a1
+          maxItems: 100
+          minItems: 1
+          uniqueItems: true
+      required:
+        - name
+        - managerId
+        - memberIds
+      description: Creates an Active team. Existing users only; every member eligible/active; manager must
+        be active SalesManager/Admin and in the final membership. Members do not gain global roles.
+    TeamPatchInput:
+      type: object
+      additionalProperties: false
+      properties:
+        version: &a13
+          type: integer
+          minimum: 1
+          maximum: 4294967295
+        name: *a10
+        description: *a11
+        managerId: *a1
+        memberIds: *a12
+        reason: &a14
+          type: string
+          maxLength: 1000
+          minLength: 1
+      required:
+        - version
+      description: memberIds, if supplied, is the COMPLETE desired active set, not additions. Omitted
+        preserves; empty/duplicate invalid. Manager/member changes require reason. Removal checks
+        all owned active assignments before any write. Same-pair reactivation retains first
+        metadata. No-op leaves version/audit unchanged after stale-version checking. Archived edits
+        preserve Archived status.
+    LifecycleInput:
+      type: object
+      additionalProperties: false
+      properties:
+        version: *a13
+        reason: *a14
+      required:
+        - version
+        - reason
+    TeamSummary:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *a1
+        code: &a18
+          type: string
+          maxLength: 30
+        name: *a10
+        status: &a19
+          type: string
+          enum:
+            - Active
+            - Archived
+        manager: &a20
+          type: object
+          additionalProperties: false
+          properties:
+            id: *a1
+            displayName:
+              type: string
+              maxLength: 150
+          required:
+            - id
+            - displayName
+        activeMemberCount: &a15
+          type: integer
+          minimum: 0
+        eligibleMemberCount: *a15
+        version: *a13
+      required:
+        - id
+        - code
+        - name
+        - status
+        - manager
+        - activeMemberCount
+        - eligibleMemberCount
+        - version
+    Member:
+      type: object
+      additionalProperties: false
+      properties:
+        userId: *a1
+        displayName:
+          type: string
+          maxLength: 150
+        teamRole:
+          type: string
+          enum:
+            - Manager
+            - Member
+        membershipActive: &a16
+          type: boolean
+        userActive: *a16
+        joinedAt: &a17
+          type: string
+          format: date-time
+          nullable: true
+        lastActivatedAt: *a17
+        removedAt: *a17
+        removedBy: &a22
+          type: string
+          format: uuid
+          nullable: true
+      required:
+        - userId
+        - displayName
+        - teamRole
+        - membershipActive
+        - userActive
+        - joinedAt
+        - lastActivatedAt
+    IntegrityWarning:
+      type: object
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          enum:
+            - INVALID_MANAGER
+            - INVALID_MEMBER
+            - LEGACY_PROVENANCE_UNKNOWN
+            - LEGACY_MEMBERSHIP_PROVENANCE_UNKNOWN
+            - LEGACY_ARCHIVE_PROVENANCE_UNKNOWN
+        message:
+          type: string
+        userId: *a1
+      required:
+        - code
+        - message
+    Blocker:
+      type: object
+      additionalProperties: false
+      properties:
+        entityType:
+          type: string
+          enum:
+            - customer
+            - quotation
+            - salesOrder
+        id: *a1
+        number:
+          type: string
+          maxLength: 50
+        status:
+          type: string
+          maxLength: 32
+        ownerId: *a1
+        validityEnded: *a16
+        href:
+          type: string
+          maxLength: 200
+      required:
+        - entityType
+        - id
+        - number
+        - status
+        - ownerId
+        - validityEnded
+        - href
+    AssignmentSummary:
+      type: object
+      additionalProperties: false
+      properties:
+        activeCustomerCount: *a15
+        openQuotationCount: *a15
+        openSalesOrderCount: *a15
+        canArchive: *a16
+        blockerCount: *a15
+        restrictedBlockers: *a16
+        countsScope: &a23
+          type: string
+          enum:
+            - all-company
+            - actor-visible-teams
+        blockerCountScope: &a24
+          type: string
+          enum:
+            - all-company
+            - actor-visible-teams
+        blockers: &a25
+          type: array
+          items:
+            $ref: "#/components/schemas/Blocker"
+          maxItems: 20
+      required:
+        - activeCustomerCount
+        - openQuotationCount
+        - openSalesOrderCount
+        - canArchive
+        - blockerCount
+        - restrictedBlockers
+        - countsScope
+        - blockerCountScope
+        - blockers
+      description: All count fields/examples are visibility filtered for non-Admins. canArchive checks ALL
+        assignments; restrictedBlockers=true can accompany blockerCount=0. No hidden global totals
+        or examples are exposed.
+    TeamDetail:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *a1
+        code: *a18
+        name: *a10
+        status: *a19
+        manager: *a20
+        activeMemberCount: *a15
+        eligibleMemberCount: *a15
+        version: *a13
+        description: *a11
+        managerId: *a1
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/Member"
+          maxItems: 500
+        createdAt: &a21
+          type: string
+          format: date-time
+        updatedAt: *a21
+        createdBy: *a22
+        updatedBy: *a22
+        archivedAt: *a17
+        archivedBy: *a22
+        archiveReason:
+          type: string
+          maxLength: 1000
+          nullable: true
+        assignmentSummary:
+          $ref: "#/components/schemas/AssignmentSummary"
+        integrityWarnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntegrityWarning"
+          maxItems: 503
+        eligibleForAssignment: *a16
+        allowedActions:
+          type: array
+          items:
+            type: string
+            enum:
+              - edit
+              - archive
+              - reactivate
+          maxItems: 3
+      required:
+        - id
+        - code
+        - name
+        - status
+        - manager
+        - activeMemberCount
+        - eligibleMemberCount
+        - version
+        - description
+        - managerId
+        - members
+        - createdAt
+        - updatedAt
+        - createdBy
+        - updatedBy
+        - archivedAt
+        - archivedBy
+        - archiveReason
+        - assignmentSummary
+        - integrityWarnings
+        - eligibleForAssignment
+        - allowedActions
+    TeamResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/TeamDetail"
+      required:
+        - data
+    TeamList:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamSummary"
+          maxItems: 100
+        meta:
+          type: object
+          additionalProperties: false
+          properties:
+            page:
+              type: integer
+              minimum: 1
+            pageSize:
+              type: integer
+              minimum: 1
+              maximum: 100
+            total: *a15
+          required:
+            - page
+            - pageSize
+            - total
+      required:
+        - data
+        - meta
+    BlockerDetails:
+      type: object
+      additionalProperties: false
+      properties:
+        activeCustomerCount: *a15
+        openQuotationCount: *a15
+        openSalesOrderCount: *a15
+        canArchive: *a16
+        blockerCount: *a15
+        restrictedBlockers: *a16
+        countsScope: *a23
+        blockerCountScope: *a24
+        blockers: *a25
+        members:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              memberId: *a1
+              blockerCount: *a15
+              restrictedBlockers: *a16
+            required:
+              - memberId
+              - blockerCount
+              - restrictedBlockers
+          maxItems: 100
+      required:
+        - activeCustomerCount
+        - openQuotationCount
+        - openSalesOrderCount
+        - canArchive
+        - blockerCount
+        - restrictedBlockers
+        - countsScope
+        - blockerCountScope
+        - blockers
+    Error:
+      type: object
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          properties:
+            code:
+              type: string
+              enum:
+                - INVALID_REQUEST
+                - MALFORMED_JSON
+                - INVALID_IDEMPOTENCY_KEY
+                - UNAUTHENTICATED
+                - INVALID_PRINCIPAL
+                - FORBIDDEN
+                - NOT_FOUND
+                - STALE_VERSION
+                - INVALID_TRANSITION
+                - MANAGER_MUST_BE_MEMBER
+                - INVALID_MANAGER
+                - INVALID_MEMBER
+                - INVALID_TEAM_OWNER
+                - MEMBER_HAS_ACTIVE_ASSIGNMENTS
+                - TEAM_HAS_ACTIVE_ASSIGNMENTS
+                - IDEMPOTENCY_KEY_REUSED
+                - VERSION_EXHAUSTED
+                - SEQUENCE_EXHAUSTED
+                - VALIDATION_ERROR
+                - CONSTRAINT_CONFLICT
+                - REFERENCED_RECORD_CONFLICT
+                - PAYLOAD_TOO_LARGE
+                - INTERNAL_ERROR
+            message:
+              type: string
+            fields:
+              type: object
+              additionalProperties:
+                type: string
+            details:
+              $ref: "#/components/schemas/BlockerDetails"
+            requestId: *a1
+          required:
+            - code
+            - message
+            - requestId
+      required:
+        - error
+    Staff:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *a1
+        displayName:
+          type: string
+          maxLength: 150
+        role:
+          type: string
+          enum:
+            - Sales
+            - SalesManager
+            - Admin
+            - Viewer
+        managerEligible: *a16
+      required:
+        - id
+        - displayName
+        - role
+        - managerEligible
+    StaffList:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Staff"
+          maxItems: 100
+        meta:
+          type: object
+          additionalProperties: false
+          properties:
+            page: *a15
+            pageSize: *a15
+            total: *a15
+          required:
+            - page
+            - pageSize
+            - total
+      required:
+        - data
+        - meta
+    ReassignmentInput:
+      type: object
+      additionalProperties: false
+      properties:
+        entityType:
+          type: string
+          enum:
+            - customer
+            - quotation
+            - salesOrder
+        entityId: *a1
+        salesTeamId: *a1
+        ownerId: *a1
+        version: *a13
+        reason: *a14
+      required:
+        - entityType
+        - entityId
+        - salesTeamId
+        - ownerId
+        - version
+        - reason
+    ReassignmentResult:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          oneOf:
+            - $ref: ./customers.openapi.yaml#/components/schemas/CustomerDetail
+            - $ref: ./quotations.openapi.yaml#/components/schemas/QuotationDetail
+            - $ref: ./sales-orders.openapi.yaml#/components/schemas/OrderDetail
+      required:
+        - data

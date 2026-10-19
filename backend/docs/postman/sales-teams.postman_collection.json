@@ -1,0 +1,414 @@
+{
+  "info": {
+    "name": "Garment ERP · Sales Teams",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Six Team APIs in the first folder; separately identified supporting/dependent APIs in the second. Uses the fixed Admin development server4102. No role headers or fake tokens. Run seed:teams first for Merchandiser B. See sales-teams-verification.md for the blocker/reassignment/removal journey."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:4102/api/v1"
+    },
+    {
+      "key": "teamId",
+      "value": ""
+    },
+    {
+      "key": "teamVersion",
+      "value": "1"
+    },
+    {
+      "key": "createKey",
+      "value": "postman-export-team-v1"
+    },
+    {
+      "key": "managerId",
+      "value": "10000000-0000-4000-8000-000000000002"
+    },
+    {
+      "key": "merchandiserAId",
+      "value": "10000000-0000-4000-8000-000000000001"
+    },
+    {
+      "key": "merchandiserBId",
+      "value": "10000000-0000-4000-8000-000000000005"
+    },
+    {
+      "key": "entityId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Sales Teams · exactly six APIs",
+      "item": [
+        {
+          "name": "1 · List teams",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/sales-teams?status=Active&page=1&pageSize=20",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "List summaries and live membership counts."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Request completed',()=>pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data=pm.response.json().data; if(data && data.code && data.code.startsWith('TEAM-')) {pm.collectionVariables.set('teamId',data.id);pm.collectionVariables.set('teamVersion',String(data.version));}}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 · Create Export Sales",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/sales-teams",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{createKey}}"
+              }
+            ],
+            "description": "Retain createKey and exact payload on retries; change key only for an intentionally different team.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Export Sales\",\n  \"description\": \"Overseas garment buyers\",\n  \"managerId\": \"{{managerId}}\",\n  \"memberIds\": [\n    \"{{managerId}}\",\n    \"{{merchandiserAId}}\",\n    \"{{merchandiserBId}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Request completed',()=>pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data=pm.response.json().data; if(data && data.code && data.code.startsWith('TEAM-')) {pm.collectionVariables.set('teamId',data.id);pm.collectionVariables.set('teamVersion',String(data.version));}}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3 · Profile/edit detail",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/sales-teams/{{teamId}}?includeInactiveMembers=true",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "Captures the current teamVersion. Inspect warnings, blockers and durable rows."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Request completed',()=>pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data=pm.response.json().data; if(data && data.code && data.code.startsWith('TEAM-')) {pm.collectionVariables.set('teamId',data.id);pm.collectionVariables.set('teamVersion',String(data.version));}}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4 · Update profile",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/sales-teams/{{teamId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "memberIds omitted preserves membership. To remove, supply the COMPLETE final set and a reason; do not send only additions.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{teamVersion}},\n  \"description\": \"Updated export buyer responsibilities\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Request completed',()=>pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data=pm.response.json().data; if(data && data.code && data.code.startsWith('TEAM-')) {pm.collectionVariables.set('teamId',data.id);pm.collectionVariables.set('teamVersion',String(data.version));}}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5 · Archive team",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/sales-teams/{{teamId}}/archive",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "409 when active customer/open quotation/order assignments remain. Delivered orders also block.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{teamVersion}},\n  \"reason\": \"Team merged into regional sales\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Request completed',()=>pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data=pm.response.json().data; if(data && data.code && data.code.startsWith('TEAM-')) {pm.collectionVariables.set('teamId',data.id);pm.collectionVariables.set('teamVersion',String(data.version));}}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6 · Reactivate team",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/sales-teams/{{teamId}}/reactivate",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "Repair manager/member eligibility via PATCH before retrying a422.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{teamVersion}},\n  \"reason\": \"Export sales operation resumed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Request completed',()=>pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data=pm.response.json().data; if(data && data.code && data.code.startsWith('TEAM-')) {pm.collectionVariables.set('teamId',data.id);pm.collectionVariables.set('teamVersion',String(data.version));}}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Separate supporting dependencies and existing assignment lists",
+      "item": [
+        {
+          "name": "Existing staff directory",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users?status=Active&page=1&pageSize=100",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "Separate supporting dependency; returns only ID/display name/role/manager eligibility."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Request completed',()=>pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data=pm.response.json().data; if(data && data.code && data.code.startsWith('TEAM-')) {pm.collectionVariables.set('teamId',data.id);pm.collectionVariables.set('teamVersion',String(data.version));}}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eligible managers",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users?status=Active&managerEligible=true",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "Select active SalesManager/Admin; membership does not promote global role."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Request completed',()=>pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data=pm.response.json().data; if(data && data.code && data.code.startsWith('TEAM-')) {pm.collectionVariables.set('teamId',data.id);pm.collectionVariables.set('teamVersion',String(data.version));}}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reassign one customer or open document",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/assignments/reassign",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "Separate supporting route. Supply the ENTITY version, not teamVersion. customer, quotation or salesOrder. Current source+target permission is required.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entityType\": \"quotation\",\n  \"entityId\": \"{{entityId}}\",\n  \"salesTeamId\": \"{{teamId}}\",\n  \"ownerId\": \"{{merchandiserBId}}\",\n  \"version\": 1,\n  \"reason\": \"Reassigned before member removal\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Request completed',()=>pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data=pm.response.json().data; if(data && data.code && data.code.startsWith('TEAM-')) {pm.collectionVariables.set('teamId',data.id);pm.collectionVariables.set('teamVersion',String(data.version));}}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Customer assignments",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/customers?salesTeamId={{teamId}}&status=All&page=1&pageSize=20",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "Existing customer history/assignments."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Request completed',()=>pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data=pm.response.json().data; if(data && data.code && data.code.startsWith('TEAM-')) {pm.collectionVariables.set('teamId',data.id);pm.collectionVariables.set('teamVersion',String(data.version));}}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Quotation assignments",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/quotations?salesTeamId={{teamId}}&includeRevisions=true&page=1&pageSize=20",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "Existing quotation list; include all revisions."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Request completed',()=>pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data=pm.response.json().data; if(data && data.code && data.code.startsWith('TEAM-')) {pm.collectionVariables.set('teamId',data.id);pm.collectionVariables.set('teamVersion',String(data.version));}}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sales order assignments",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/sales-orders?salesTeamId={{teamId}}&page=1&pageSize=20",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "Existing order list; terminal history remains linked."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Request completed',()=>pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data=pm.response.json().data; if(data && data.code && data.code.startsWith('TEAM-')) {pm.collectionVariables.set('teamId',data.id);pm.collectionVariables.set('teamVersion',String(data.version));}}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,959 @@
+openapi: 3.0.3
+info:
+  title: Garment ERP Sales Teams
+  version: 1.0.0
+  description: Exactly six Sales Teams endpoints. Staff directory and one-record reassignment are
+    separately documented supporting dependencies. Single company; no login/invitation/messaging,
+    payroll, targets or commission APIs. Legacy metadata remains NULL, with warnings, instead of
+    invented actors/timestamps.
+servers:
+  - url: http://127.0.0.1:4102/api/v1
+    description: Local Admin development instance; fixed actor configured server-side, prohibited in production
+paths:
+  /sales-teams:
+    get:
+      operationId: listSalesTeams
+      summary: Search teams
+      description: Scope before count/pagination; q matches literal code/name substring with escaped
+        backslash/%/_. Fixed two list SQL queries use joined aggregate member counts; no N+1. Active
+        membership and active user counts differ.
+      tags:
+        - Sales Teams
+      x-authentication: Trusted req.user only. Admin or sales-teams:write manages team masters globally;
+        other readers need both a claimed team scope and live active membership. Management
+        capability alone does not expand commercial-record visibility.
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 100
+            minLength: 1
+          description: Literal substring
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - Active
+              - Archived
+              - All
+            default: Active
+          description: Derived is_active filter
+        - name: managerId
+          in: query
+          required: false
+          schema: &a1
+            type: string
+            format: uuid
+          description: Exact manager
+        - name: memberId
+          in: query
+          required: false
+          schema: *a1
+          description: Active membership pair, even if staff account became inactive
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000000
+            default: 1
+          description: Page
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Page size
+        - name: sortBy
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - name
+              - code
+              - createdAt
+            default: name
+          description: Stable ID tie-breaker
+        - name: sortOrder
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: asc
+          description: Direction
+      responses:
+        "200":
+          description: Team summaries
+          headers:
+            X-Request-Id:
+              schema: *a1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamList"
+              example:
+                data:
+                  - id: 20000000-0000-4000-8000-000000000002
+                    code: TEAM-000001
+                    name: Export Sales
+                    status: Active
+                    manager: &a2
+                      id: 10000000-0000-4000-8000-000000000002
+                      displayName: Demo SalesManager
+                    activeMemberCount: 3
+                    eligibleMemberCount: 3
+                    version: 1
+                meta:
+                  page: 1
+                  pageSize: 20
+                  total: 1
+        "400": &a3
+          description: Malformed query/path/header, JSON or invalid Idempotency-Key
+          headers:
+            X-Request-Id:
+              schema: *a1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401": &a4
+          description: Invalid/inactive principal or stale role claim
+          headers:
+            X-Request-Id:
+              schema: *a1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": &a5
+          description: Sanitized unexpected failure
+          headers:
+            X-Request-Id:
+              schema: *a1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      operationId: createSalesTeam
+      summary: Create team with existing staff
+      description: Idempotent transaction includes sequence, memberships, audit and saved201 result.
+        Canonical hash binds POST /api/v1/sales-teams and parsed body with sorted object keys and
+        sorted member ID set. Replay checks current permission. Different keys allow same-name
+        teams. No user creation or permission promotion.
+      tags:
+        - Sales Teams
+      x-authentication: Trusted req.user only. Admin or sales-teams:write manages team masters globally;
+        other readers need both a claimed team scope and live active membership. Management
+        capability alone does not expand commercial-record visibility.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            maxLength: 128
+            minLength: 1
+            pattern: ^[!-~]+$
+          description: Retain for unknown-outcome retry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamCreateInput"
+            example:
+              name: Export Sales
+              description: Manages overseas garment buyers and orders
+              managerId: 10000000-0000-4000-8000-000000000002
+              memberIds:
+                - 10000000-0000-4000-8000-000000000002
+                - 10000000-0000-4000-8000-000000000001
+                - 10000000-0000-4000-8000-000000000005
+      responses:
+        "201":
+          description: Created or authorized exact replay
+          headers:
+            X-Request-Id:
+              schema: *a1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamResponse"
+              example:
+                data: &a6
+                  id: 20000000-0000-4000-8000-000000000002
+                  code: TEAM-000001
+                  name: Export Sales
+                  description: Manages overseas garment buyers and orders
+                  status: Active
+                  manager: *a2
+                  managerId: 10000000-0000-4000-8000-000000000002
+                  activeMemberCount: 3
+                  eligibleMemberCount: 3
+                  version: 1
+                  createdAt: 2026-10-19T00:00:00.000Z
+                  updatedAt: 2026-10-19T00:00:00.000Z
+                  createdBy: 10000000-0000-4000-8000-000000000003
+                  updatedBy: 10000000-0000-4000-8000-000000000003
+                  archivedAt: null
+                  archivedBy: null
+                  archiveReason: null
+                  members: &a9
+                    - userId: 10000000-0000-4000-8000-000000000002
+                      displayName: Demo SalesManager
+                      teamRole: Manager
+                      membershipActive: true
+                      userActive: true
+                      joinedAt: 2026-10-19T00:00:00.000Z
+                      lastActivatedAt: 2026-10-19T00:00:00.000Z
+                    - userId: 10000000-0000-4000-8000-000000000001
+                      displayName: Demo merchandiser
+                      teamRole: Member
+                      membershipActive: true
+                      userActive: true
+                      joinedAt: 2026-10-19T00:00:00.000Z
+                      lastActivatedAt: 2026-10-19T00:00:00.000Z
+                    - userId: 10000000-0000-4000-8000-000000000005
+                      displayName: Demo merchandiser
+                      teamRole: Member
+                      membershipActive: true
+                      userActive: true
+                      joinedAt: 2026-10-19T00:00:00.000Z
+                      lastActivatedAt: 2026-10-19T00:00:00.000Z
+                  assignmentSummary: &a10
+                    activeCustomerCount: 0
+                    openQuotationCount: 0
+                    openSalesOrderCount: 0
+                    canArchive: true
+                    blockerCount: 0
+                    restrictedBlockers: false
+                    countsScope: all-company
+                    blockerCountScope: all-company
+                    blockers: []
+                  integrityWarnings: &a11 []
+                  eligibleForAssignment: true
+                  allowedActions: &a12
+                    - edit
+                    - archive
+        "400": *a3
+        "401": *a4
+        "403": &a13
+          description: Missing management/assignment capability
+          headers:
+            X-Request-Id:
+              schema: *a1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404": &a7
+          description: Missing or outside current live scope
+          headers:
+            X-Request-Id:
+              schema: *a1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409": &a14
+          description: STALE_VERSION, INVALID_TRANSITION, ownership blockers, key reuse or constraint conflict
+          headers:
+            X-Request-Id:
+              schema: *a1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413": &a15
+          description: JSON body exceeds1MB
+          headers:
+            X-Request-Id:
+              schema: *a1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422": &a16
+          description: VALIDATION_ERROR, INVALID_MANAGER, INVALID_MEMBER or MANAGER_MUST_BE_MEMBER
+          headers:
+            X-Request-Id:
+              schema: *a1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": *a5
+  /sales-teams/{id}:
+    get:
+      operationId: getSalesTeam
+      summary: Read team profile and assignment summary
+      description: Archived team historical reads retain active membership access. Removed users lose
+        team-derived access despite stale claims. Default hides inactive members;
+        includeInactiveMembers includes removal metadata. Unknown legacy creator/activation metadata
+        remains nullable and is warned; no historical facts are inferred. Examples max20 and
+        visibility filtered; no unbounded history.
+      tags:
+        - Sales Teams
+      x-authentication: Trusted req.user only. Admin or sales-teams:write manages team masters globally;
+        other readers need both a claimed team scope and live active membership. Management
+        capability alone does not expand commercial-record visibility.
+      parameters:
+        - &a8
+          name: id
+          in: path
+          required: true
+          schema: *a1
+          description: Team UUID
+        - name: includeInactiveMembers
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Include inactive rows/removal metadata
+      responses:
+        "200":
+          description: Team profile
+          headers:
+            X-Request-Id:
+              schema: *a1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamResponse"
+              example:
+                data: *a6
+        "400": *a3
+        "401": *a4
+        "404": *a7
+        "500": *a5
+    patch:
+      operationId: patchSalesTeam
+      summary: Edit profile, manager and complete member set atomically
+      description: Version under parent UPDATE lock. Supplied memberIds replaces active set; omission
+        preserves. Every final member eligible/active; manager included. All manager/member changes
+        need reason. Removals check all active owned records in this team only; any blocker rolls
+        back entire request. Deactivate durable pairs; re-add updates last activation while
+        preserving first activation/actor. New version once; no-op has no audit/version increment.
+        Archived repairs remain Archived.
+      tags:
+        - Sales Teams
+      x-authentication: Trusted req.user only. Admin or sales-teams:write manages team masters globally;
+        other readers need both a claimed team scope and live active membership. Management
+        capability alone does not expand commercial-record visibility.
+      parameters:
+        - *a8
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamPatchInput"
+            example:
+              version: 3
+              managerId: 10000000-0000-4000-8000-000000000002
+              memberIds:
+                - 10000000-0000-4000-8000-000000000002
+                - 10000000-0000-4000-8000-000000000005
+              reason: Merchandiser A moved to another team
+      responses:
+        "200":
+          description: Updated detail including inactive memberships
+          headers:
+            X-Request-Id:
+              schema: *a1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamResponse"
+              example:
+                data:
+                  id: 20000000-0000-4000-8000-000000000002
+                  code: TEAM-000001
+                  name: Export Sales
+                  description: Manages overseas garment buyers and orders
+                  status: Active
+                  manager: *a2
+                  managerId: 10000000-0000-4000-8000-000000000002
+                  activeMemberCount: 3
+                  eligibleMemberCount: 3
+                  version: 4
+                  createdAt: 2026-10-19T00:00:00.000Z
+                  updatedAt: 2026-10-19T00:00:00.000Z
+                  createdBy: 10000000-0000-4000-8000-000000000003
+                  updatedBy: 10000000-0000-4000-8000-000000000003
+                  archivedAt: null
+                  archivedBy: null
+                  archiveReason: null
+                  members: *a9
+                  assignmentSummary: *a10
+                  integrityWarnings: *a11
+                  eligibleForAssignment: true
+                  allowedActions: *a12
+        "400": *a3
+        "401": *a4
+        "403": *a13
+        "404": *a7
+        "409": *a14
+        "413": *a15
+        "422": *a16
+        "500": *a5
+  /sales-teams/{id}/archive:
+    post:
+      operationId: archiveSalesTeam
+      summary: Archive after resolving active assignments
+      description: Blocks Active customers; every nondeleted
+        Draft/PendingApproval/Approved/Issued/Accepted quotation revision;
+        Draft/Confirmed/InProgress/PartiallyDelivered/Delivered orders. Delivered still blocks.
+        Stale expired Issued status blocks without hidden mutation. Other terminal/deleted documents
+        and archived customers do not block. Preserves membership/users/history/snapshots. Team
+        UPDATE + fresh READ COMMITTED blocker reads never takes reverse entity locks.
+      tags:
+        - Sales Teams
+      x-authentication: Trusted req.user only. Admin or sales-teams:write manages team masters globally;
+        other readers need both a claimed team scope and live active membership. Management
+        capability alone does not expand commercial-record visibility.
+      parameters:
+        - *a8
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LifecycleInput"
+            example:
+              version: 4
+              reason: Team merged into regional sales
+      responses:
+        "200":
+          description: Archived team
+          headers:
+            X-Request-Id:
+              schema: *a1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamResponse"
+              example:
+                data:
+                  id: 20000000-0000-4000-8000-000000000002
+                  code: TEAM-000001
+                  name: Export Sales
+                  description: Manages overseas garment buyers and orders
+                  status: Archived
+                  manager: *a2
+                  managerId: 10000000-0000-4000-8000-000000000002
+                  activeMemberCount: 3
+                  eligibleMemberCount: 3
+                  version: 5
+                  createdAt: 2026-10-19T00:00:00.000Z
+                  updatedAt: 2026-10-19T00:00:00.000Z
+                  createdBy: 10000000-0000-4000-8000-000000000003
+                  updatedBy: 10000000-0000-4000-8000-000000000003
+                  archivedAt: 2026-10-19T01:00:00.000Z
+                  archivedBy: 10000000-0000-4000-8000-000000000003
+                  archiveReason: Team merged into regional sales
+                  members: *a9
+                  assignmentSummary: *a10
+                  integrityWarnings: *a11
+                  eligibleForAssignment: false
+                  allowedActions:
+                    - edit
+                    - reactivate
+        "400": *a3
+        "401": *a4
+        "403": *a13
+        "404": *a7
+        "409": *a14
+        "413": *a15
+        "422": *a16
+        "500": *a5
+  /sales-teams/{id}/reactivate:
+    post:
+      operationId: reactivateSalesTeam
+      summary: Reactivate an eligible archived team
+      description: Revalidates active staff, manager approval role and final manager membership. Repair
+        via PATCH first. Clears current archive metadata, preserves append-only history and opens no
+        commercial documents.
+      tags:
+        - Sales Teams
+      x-authentication: Trusted req.user only. Admin or sales-teams:write manages team masters globally;
+        other readers need both a claimed team scope and live active membership. Management
+        capability alone does not expand commercial-record visibility.
+      parameters:
+        - *a8
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LifecycleInput"
+            example:
+              version: 5
+              reason: Export sales operation resumed
+      responses:
+        "200":
+          description: Active team
+          headers:
+            X-Request-Id:
+              schema: *a1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamResponse"
+              example:
+                data:
+                  id: 20000000-0000-4000-8000-000000000002
+                  code: TEAM-000001
+                  name: Export Sales
+                  description: Manages overseas garment buyers and orders
+                  status: Active
+                  manager: *a2
+                  managerId: 10000000-0000-4000-8000-000000000002
+                  activeMemberCount: 3
+                  eligibleMemberCount: 3
+                  version: 6
+                  createdAt: 2026-10-19T00:00:00.000Z
+                  updatedAt: 2026-10-19T00:00:00.000Z
+                  createdBy: 10000000-0000-4000-8000-000000000003
+                  updatedBy: 10000000-0000-4000-8000-000000000003
+                  archivedAt: null
+                  archivedBy: null
+                  archiveReason: null
+                  members: *a9
+                  assignmentSummary: *a10
+                  integrityWarnings: *a11
+                  eligibleForAssignment: true
+                  allowedActions: *a12
+        "400": *a3
+        "401": *a4
+        "403": *a13
+        "404": *a7
+        "409": *a14
+        "413": *a15
+        "422": *a16
+        "500": *a5
+components:
+  schemas:
+    TeamCreateInput:
+      type: object
+      additionalProperties: false
+      properties:
+        name: &a17
+          type: string
+          maxLength: 150
+          minLength: 2
+        description: &a18
+          type: string
+          maxLength: 1000
+          nullable: true
+        managerId: *a1
+        memberIds: &a19
+          type: array
+          items: *a1
+          maxItems: 100
+          minItems: 1
+          uniqueItems: true
+      required:
+        - name
+        - managerId
+        - memberIds
+      description: Creates an Active team. Existing users only; every member eligible/active; manager must
+        be active SalesManager/Admin and in the final membership. Members do not gain global roles.
+    TeamPatchInput:
+      type: object
+      additionalProperties: false
+      properties:
+        version: &a20
+          type: integer
+          minimum: 1
+          maximum: 4294967295
+        name: *a17
+        description: *a18
+        managerId: *a1
+        memberIds: *a19
+        reason: &a21
+          type: string
+          maxLength: 1000
+          minLength: 1
+      required:
+        - version
+      description: memberIds, if supplied, is the COMPLETE desired active set, not additions. Omitted
+        preserves; empty/duplicate invalid. Manager/member changes require reason. Removal checks
+        all owned active assignments before any write. Same-pair reactivation retains first
+        metadata. No-op leaves version/audit unchanged after stale-version checking. Archived edits
+        preserve Archived status.
+    LifecycleInput:
+      type: object
+      additionalProperties: false
+      properties:
+        version: *a20
+        reason: *a21
+      required:
+        - version
+        - reason
+    TeamSummary:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *a1
+        code: &a25
+          type: string
+          maxLength: 30
+        name: *a17
+        status: &a26
+          type: string
+          enum:
+            - Active
+            - Archived
+        manager: &a27
+          type: object
+          additionalProperties: false
+          properties:
+            id: *a1
+            displayName:
+              type: string
+              maxLength: 150
+          required:
+            - id
+            - displayName
+        activeMemberCount: &a22
+          type: integer
+          minimum: 0
+        eligibleMemberCount: *a22
+        version: *a20
+      required:
+        - id
+        - code
+        - name
+        - status
+        - manager
+        - activeMemberCount
+        - eligibleMemberCount
+        - version
+    Member:
+      type: object
+      additionalProperties: false
+      properties:
+        userId: *a1
+        displayName:
+          type: string
+          maxLength: 150
+        teamRole:
+          type: string
+          enum:
+            - Manager
+            - Member
+        membershipActive: &a23
+          type: boolean
+        userActive: *a23
+        joinedAt: &a24
+          type: string
+          format: date-time
+          nullable: true
+        lastActivatedAt: *a24
+        removedAt: *a24
+        removedBy: &a29
+          type: string
+          format: uuid
+          nullable: true
+      required:
+        - userId
+        - displayName
+        - teamRole
+        - membershipActive
+        - userActive
+        - joinedAt
+        - lastActivatedAt
+    IntegrityWarning:
+      type: object
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          enum:
+            - INVALID_MANAGER
+            - INVALID_MEMBER
+            - LEGACY_PROVENANCE_UNKNOWN
+            - LEGACY_MEMBERSHIP_PROVENANCE_UNKNOWN
+            - LEGACY_ARCHIVE_PROVENANCE_UNKNOWN
+        message:
+          type: string
+        userId: *a1
+      required:
+        - code
+        - message
+    Blocker:
+      type: object
+      additionalProperties: false
+      properties:
+        entityType:
+          type: string
+          enum:
+            - customer
+            - quotation
+            - salesOrder
+        id: *a1
+        number:
+          type: string
+          maxLength: 50
+        status:
+          type: string
+          maxLength: 32
+        ownerId: *a1
+        validityEnded: *a23
+        href:
+          type: string
+          maxLength: 200
+      required:
+        - entityType
+        - id
+        - number
+        - status
+        - ownerId
+        - validityEnded
+        - href
+    AssignmentSummary:
+      type: object
+      additionalProperties: false
+      properties:
+        activeCustomerCount: *a22
+        openQuotationCount: *a22
+        openSalesOrderCount: *a22
+        canArchive: *a23
+        blockerCount: *a22
+        restrictedBlockers: *a23
+        countsScope: &a30
+          type: string
+          enum:
+            - all-company
+            - actor-visible-teams
+        blockerCountScope: &a31
+          type: string
+          enum:
+            - all-company
+            - actor-visible-teams
+        blockers: &a32
+          type: array
+          items:
+            $ref: "#/components/schemas/Blocker"
+          maxItems: 20
+      required:
+        - activeCustomerCount
+        - openQuotationCount
+        - openSalesOrderCount
+        - canArchive
+        - blockerCount
+        - restrictedBlockers
+        - countsScope
+        - blockerCountScope
+        - blockers
+      description: All count fields/examples are visibility filtered for non-Admins. canArchive checks ALL
+        assignments; restrictedBlockers=true can accompany blockerCount=0. No hidden global totals
+        or examples are exposed.
+    TeamDetail:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *a1
+        code: *a25
+        name: *a17
+        status: *a26
+        manager: *a27
+        activeMemberCount: *a22
+        eligibleMemberCount: *a22
+        version: *a20
+        description: *a18
+        managerId: *a1
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/Member"
+          maxItems: 500
+        createdAt: &a28
+          type: string
+          format: date-time
+        updatedAt: *a28
+        createdBy: *a29
+        updatedBy: *a29
+        archivedAt: *a24
+        archivedBy: *a29
+        archiveReason:
+          type: string
+          maxLength: 1000
+          nullable: true
+        assignmentSummary:
+          $ref: "#/components/schemas/AssignmentSummary"
+        integrityWarnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntegrityWarning"
+          maxItems: 503
+        eligibleForAssignment: *a23
+        allowedActions:
+          type: array
+          items:
+            type: string
+            enum:
+              - edit
+              - archive
+              - reactivate
+          maxItems: 3
+      required:
+        - id
+        - code
+        - name
+        - status
+        - manager
+        - activeMemberCount
+        - eligibleMemberCount
+        - version
+        - description
+        - managerId
+        - members
+        - createdAt
+        - updatedAt
+        - createdBy
+        - updatedBy
+        - archivedAt
+        - archivedBy
+        - archiveReason
+        - assignmentSummary
+        - integrityWarnings
+        - eligibleForAssignment
+        - allowedActions
+    TeamResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/TeamDetail"
+      required:
+        - data
+    TeamList:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamSummary"
+          maxItems: 100
+        meta:
+          type: object
+          additionalProperties: false
+          properties:
+            page:
+              type: integer
+              minimum: 1
+            pageSize:
+              type: integer
+              minimum: 1
+              maximum: 100
+            total: *a22
+          required:
+            - page
+            - pageSize
+            - total
+      required:
+        - data
+        - meta
+    BlockerDetails:
+      type: object
+      additionalProperties: false
+      properties:
+        activeCustomerCount: *a22
+        openQuotationCount: *a22
+        openSalesOrderCount: *a22
+        canArchive: *a23
+        blockerCount: *a22
+        restrictedBlockers: *a23
+        countsScope: *a30
+        blockerCountScope: *a31
+        blockers: *a32
+        members:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              memberId: *a1
+              blockerCount: *a22
+              restrictedBlockers: *a23
+            required:
+              - memberId
+              - blockerCount
+              - restrictedBlockers
+          maxItems: 100
+      required:
+        - activeCustomerCount
+        - openQuotationCount
+        - openSalesOrderCount
+        - canArchive
+        - blockerCount
+        - restrictedBlockers
+        - countsScope
+        - blockerCountScope
+        - blockers
+    Error:
+      type: object
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          properties:
+            code:
+              type: string
+              enum:
+                - INVALID_REQUEST
+                - MALFORMED_JSON
+                - INVALID_IDEMPOTENCY_KEY
+                - UNAUTHENTICATED
+                - INVALID_PRINCIPAL
+                - FORBIDDEN
+                - NOT_FOUND
+                - STALE_VERSION
+                - INVALID_TRANSITION
+                - MANAGER_MUST_BE_MEMBER
+                - INVALID_MANAGER
+                - INVALID_MEMBER
+                - INVALID_TEAM_OWNER
+                - MEMBER_HAS_ACTIVE_ASSIGNMENTS
+                - TEAM_HAS_ACTIVE_ASSIGNMENTS
+                - IDEMPOTENCY_KEY_REUSED
+                - VERSION_EXHAUSTED
+                - SEQUENCE_EXHAUSTED
+                - VALIDATION_ERROR
+                - CONSTRAINT_CONFLICT
+                - REFERENCED_RECORD_CONFLICT
+                - PAYLOAD_TOO_LARGE
+                - INTERNAL_ERROR
+            message:
+              type: string
+            fields:
+              type: object
+              additionalProperties:
+                type: string
+            details:
+              $ref: "#/components/schemas/BlockerDetails"
+            requestId: *a1
+          required:
+            - code
+            - message
+            - requestId
+      required:
+        - error

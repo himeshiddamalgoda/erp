@@ -1,3 +1,4 @@
+import { teamGuard } from "../../shared/team-guard.js";
 import { customerGuard } from "../../shared/customer-guard.js";
 import { randomUUID, createHash } from "node:crypto";
 import Decimal from "decimal.js";
@@ -80,6 +81,7 @@ export class QuotationService {
       t && lockMasters
         ? await customerGuard(this.r, q.customerId, t)
         : await this.r.findById("customers", q.customerId, options);
+    if (t && lockMasters) await teamGuard(this.r, q.salesTeamId, q.ownerId, t);
     const team = await this.r.findById("sales_teams", q.salesTeamId, options);
     const owner = await this.r.findById("users", q.ownerId, options);
     const membership = await this.r.one("sales_team_members", {
@@ -675,8 +677,10 @@ export class QuotationService {
         await this.familySave(family, { activeIssuedRevisionId: id }, t);
         values = { status: "Issued", issuedBy: actor.id, issuedAt: new Date() };
       } else if (action === "buyer-response") {
-        if (body.decision === "Accepted")
+        if (body.decision === "Accepted") {
           await customerGuard(this.r, q.customerId, t);
+          await teamGuard(this.r, q.salesTeamId, q.ownerId, t);
+        }
         if (q.status === "Expired")
           conflict("QUOTATION_EXPIRED", "Quotation validity has ended");
         requireState(["Issued"]);

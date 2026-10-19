@@ -1,3 +1,4 @@
+import { resolveActor, lockTeams, teamGuard } from "../../shared/team-guard.js";
 import { randomUUID, createHash } from "node:crypto";
 import { AppError, conflict, invalid } from "../../shared/errors.js";
 import { authorize, allowedActions } from "./customer.policy.js";
@@ -48,25 +49,17 @@ export class CustomerService {
     if (c.version >= 4294967295)
       conflict("VERSION_EXHAUSTED", "Customer version is exhausted");
   }
-  async assignment(actor, c, t) {
+  async assignment(actor, c, t, options = {}) {
     authorize(actor, c);
-    const opt = { transaction: t, lock: t.LOCK.SHARE };
-    const team = await this.r.findById("sales_teams", c.salesTeamId, opt);
-    const owner = await this.r.findById("users", c.ownerId, opt);
-    const member = await this.r.one("sales_team_members", {
-      where: { teamId: c.salesTeamId, userId: c.ownerId },
-      ...opt,
-    });
-    if (!team?.isActive || !owner?.isActive || !member?.isActive)
-      throw new AppError(
-        422,
-        "INVALID_TEAM_OWNER",
-        "Select an active team and an active owner who belongs to it",
-        {
-          salesTeamId: "An active team is required",
-          ownerId: "Owner must be an active member of the selected team",
-        },
-      );
+    try {
+      await teamGuard(this.r, c.salesTeamId, c.ownerId, t, options);
+    } catch (error) {
+      if (error.status !== 422) throw error;
+      throw new AppError(422, "INVALID_TEAM_OWNER", error.message, {
+        salesTeamId: "An active eligible team is required",
+        ownerId: "Owner must be an active eligible team member",
+      });
+    }
   }
   validate(c, contacts, addresses) {
     // Revalidate the entire merged aggregate, including legacy/inactive rows, on every save.
@@ -402,9 +395,15 @@ export class CustomerService {
           );
       }
       authorize(actor, merged);
+      if (assignmentChanged) {
+        await lockTeams(this.r, [before.salesTeamId, merged.salesTeamId], t);
+        const live = await resolveActor(this.r, actor, t);
+        authorize(live, c, "assign");
+        authorize(live, merged);
+      }
       this.validate(merged, contacts.final, addresses.final);
       if (c.isActive || assignmentChanged)
-        await this.assignment(actor, merged, t);
+        await this.assignment(actor, merged, t, { allowStaleMembers: true });
       const disabled = addresses.changed
         .filter((x) => x.old?.isActive && !x.next.isActive)
         .map((x) => x.id);
@@ -483,6 +482,20 @@ export class CustomerService {
             to: { salesTeamId: c.salesTeamId, ownerId: c.ownerId },
           },
         );
+      if (assignmentChanged)
+        await this.r.audit(
+          c,
+          actor,
+          "AssignmentReassigned",
+          status(before),
+          body.reason,
+          requestId,
+          t,
+          {
+            from: { salesTeamId: before.salesTeamId, ownerId: before.ownerId },
+            to: { salesTeamId: c.salesTeamId, ownerId: c.ownerId },
+          },
+        );
       return this.represent(actor, c, t, true);
     });
   }
@@ -509,7 +522,7 @@ export class CustomerService {
           ),
           addresses = await this.r.children("customer_addresses", id, t, true);
         this.validate(c, contacts, addresses);
-        await this.assignment(actor, c, t);
+        await this.assignment(actor, c, t, { allowStaleMembers: true });
       }
       const previousArchive =
         action === "reactivate" ? pick(c, ["archivedAt", "archivedBy"]) : null;

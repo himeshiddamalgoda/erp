@@ -1,4 +1,8 @@
 export const ROUTES = {
+  salesTeams: "/orders/sales-teams",
+  newSalesTeam: "/orders/sales-teams/new",
+  salesTeam: (id) => `/orders/sales-teams/${id}`,
+  editSalesTeam: (id) => `/orders/sales-teams/${id}/edit`,
   customers: "/orders/customers",
   newCustomer: "/orders/customers/new",
   customer: (id) => `/orders/customers/${id}`,

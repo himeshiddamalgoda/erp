@@ -17,7 +17,7 @@ export const customerKeys = {
     inactive,
   ],
 };
-export function useCustomers(base, filters) {
+export function useCustomers(base, filters, options = {}) {
   const params = Object.fromEntries(
     Object.entries(filters).filter(([, v]) => v !== "" && v !== undefined),
   );
@@ -26,6 +26,7 @@ export function useCustomers(base, filters) {
     queryFn: ({ signal }) => api.listCustomers(base, params, signal),
     placeholderData: keepPreviousData,
     staleTime: 0,
+    ...options,
   });
 }
 export function useCustomer(base, id, inactive = false) {

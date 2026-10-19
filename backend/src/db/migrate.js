@@ -5,6 +5,7 @@ import * as links from "./migrations/002-family-links.js";
 import * as guards from "./migrations/003-commercial-guards.js";
 import * as orders from "./migrations/004-sales-orders.js";
 import * as customers from "./migrations/005-customers.js";
+import * as teams from "./migrations/006-sales-teams.js";
 export async function migrate(db, direction = "up") {
   const connection = await db.connectionManager.getConnection();
   let locked = false;
@@ -22,7 +23,7 @@ export async function migrate(db, direction = "up") {
     );
     const [rows] = await db.query("SELECT name FROM schema_migrations");
     const applied = new Set(rows.map((r) => r.name));
-    const migrations = [initial, links, guards, orders, customers];
+    const migrations = [initial, links, guards, orders, customers, teams];
     if (direction === "down") {
       const migration = migrations
         .toReversed()

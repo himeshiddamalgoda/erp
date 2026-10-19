@@ -24,13 +24,14 @@ describe("page-owned API architecture", () => {
           "src/features/quotations/components",
           "src/features/sales-orders/components",
           "src/features/customers/components",
+          "src/features/sales-teams/components",
         ].map(files),
       )
     ).flat();
     for (const path of paths) {
       const source = await readFile(path, "utf8");
       expect(source, path).not.toMatch(
-        /from\s+['"](?:axios|@tanstack\/react-query|[^'"]*\/services\/|[^'"]*\/hooks\/use-(?:quotation|sales-order|customer))/,
+        /from\s+['"](?:axios|@tanstack\/react-query|[^'"]*\/services\/|[^'"]*\/hooks\/use-(?:quotation|sales-order|customer|sales-team|staff|assignment))/,
       );
       expect(source, path).not.toMatch(/\bfetch\s*\(/);
     }

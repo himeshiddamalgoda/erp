@@ -1,9 +1,11 @@
-import { Op } from "sequelize";
+import { resolveActor } from "../../shared/team-guard.js";
+import { Op, literal } from "sequelize";
 
 export async function loadQuotationOptions({ db, models: m }, actor) {
   return db.transaction(
     { isolationLevel: "REPEATABLE READ" },
     async (transaction) => {
+      actor = await resolveActor({ m }, actor, transaction);
       const options = { transaction, raw: true };
       const teamScope =
         actor.role === "Admin" ? {} : { id: { [Op.in]: actor.salesTeamIds } };
@@ -14,7 +16,13 @@ export async function loadQuotationOptions({ db, models: m }, actor) {
         }),
         m.sales_teams.findAll({
           ...options,
-          where: { ...teamScope, isActive: true },
+          where: {
+            ...teamScope,
+            isActive: true,
+            [Op.and]: literal(
+              "EXISTS (SELECT 1 FROM users manager JOIN sales_team_members mm ON mm.user_id=manager.id AND mm.team_id=sales_teams.id AND mm.is_active=1 WHERE manager.id=sales_teams.manager_id AND manager.is_active=1 AND manager.role IN ('SalesManager','Admin')) AND NOT EXISTS (SELECT 1 FROM sales_team_members sm JOIN users su ON su.id=sm.user_id WHERE sm.team_id=sales_teams.id AND sm.is_active=1 AND (su.is_active<>1 OR su.role NOT IN ('Sales','SalesManager','Admin','Viewer')))",
+            ),
+          },
           attributes: ["id", "code", "name"],
           order: [["name", "ASC"]],
         }),
@@ -105,6 +113,7 @@ export async function loadQuotationOptions({ db, models: m }, actor) {
       ]);
       return {
         user,
+        resolvedSalesTeamIds: actor.salesTeamIds,
         customers: customers.map((customer) => ({
           ...customer,
           addresses: addresses.filter(

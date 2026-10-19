@@ -1,4 +1,10 @@
 import {
+  teamExtensions,
+  membershipExtensions,
+  teamTables,
+  teamIndexes,
+} from "./sales-team-schema.js";
+import {
   customerExtensions,
   contactExtensions,
   addressExtensions,
@@ -252,6 +258,12 @@ export function defineModels(sequelize) {
   const models = Object.fromEntries(
     Object.entries({
       ...schemas,
+      sales_teams: { ...schemas.sales_teams, ...teamExtensions },
+      sales_team_members: {
+        ...schemas.sales_team_members,
+        ...membershipExtensions,
+      },
+      ...teamTables,
       customers: { ...schemas.customers, ...customerExtensions },
       customer_contacts: { ...schemas.customer_contacts, ...contactExtensions },
       customer_addresses: {
@@ -269,6 +281,7 @@ export function defineModels(sequelize) {
           ...(indexes[table] || []),
           ...(orderIndexes[table] || []),
           ...(customerIndexes[table] || []),
+          ...(teamIndexes[table] || []),
         ],
       }),
     ]),

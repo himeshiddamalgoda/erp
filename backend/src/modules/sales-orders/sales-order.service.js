@@ -1,3 +1,4 @@
+import { teamGuard } from "../../shared/team-guard.js";
 import { customerGuard } from "../../shared/customer-guard.js";
 import { randomUUID, createHash } from "node:crypto";
 import { AppError, conflict, invalid } from "../../shared/errors.js";
@@ -150,6 +151,7 @@ export class SalesOrderService {
   async masters(o, t, complete = false) {
     const opt = { transaction: t, lock: t.LOCK.SHARE };
     const buyer = await customerGuard(this.r, o.customerId, t);
+    await teamGuard(this.r, o.salesTeamId, o.ownerId, t);
     const team = await this.r.findById("sales_teams", o.salesTeamId, opt);
     const owner = await this.r.findById("users", o.ownerId, opt);
     const member = await this.r.one("sales_team_members", {
@@ -376,6 +378,7 @@ export class SalesOrderService {
       let changes = pick(body, copyFields);
       if (o.sourceQuotationId) {
         await customerGuard(this.r, o.customerId, t);
+        await teamGuard(this.r, o.salesTeamId, o.ownerId, t);
         if ("shippingAddressId" in body)
           changes.shippingAddressSnapshot = await this.address(
             body.shippingAddressId,

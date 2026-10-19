@@ -28,6 +28,8 @@ export async function seedDemo(context) {
     await insert("sales_teams", {
       id: ids.team,
       code: "APPAREL",
+      createdBy: ids.admin,
+      updatedBy: ids.admin,
       name: "Apparel Sales",
       managerId: ids.manager,
       isActive: true,
@@ -36,7 +38,14 @@ export async function seedDemo(context) {
     for (const key of ["sales", "manager", "admin", "viewer"])
       await m.sales_team_members.findOrCreate({
         where: { teamId: ids.team, userId: ids[key] },
-        defaults: { isActive: true },
+        defaults: {
+          isActive: true,
+          joinedAt: timestamps.createdAt,
+          lastActivatedAt: timestamps.createdAt,
+          addedBy: ids.admin,
+          lastActivatedBy: ids.admin,
+          ...timestamps,
+        },
         transaction: t,
       });
     await insert("customers", {

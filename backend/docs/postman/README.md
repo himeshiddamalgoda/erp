@@ -83,3 +83,7 @@ Import `sales-orders.postman_collection.json`. Start fixed Sales and Manager bac
 ## Customers
 
 Import [customers.postman_collection.json](customers.postman_collection.json). Exactly six requests cover list/create/detail/PATCH/archive/reactivate. Default `baseUrl` is `http://127.0.0.1:4102/api/v1`, an Admin development instance; the Sales4000 server cannot write Customers by default. See [setup and journeys](../customers-verification.md). Returned IDs, warehouse IDs and versions are captured automatically. Keep the same idempotency key on create retries; use a new key for an intentionally separate buyer.
+
+## Sales Teams
+
+Import [sales-teams.postman_collection.json](sales-teams.postman_collection.json). The first folder contains exactly six Team requests; supporting staff/reassignment APIs are identified separately. Default base is the Admin4102 development instance. Run `npm run seed:teams` first. IDs/team versions are captured; reassignment uses an entity's version. See [setup and end-to-end HTTP journeys](../sales-teams-verification.md).
