@@ -20,6 +20,10 @@ erp/
 
 Node.js 22.13+ on the 22.x release line, or Node.js 24+, and npm. If you use nvm, run `nvm use` from the repository root.
 
+## One API for every workspace
+
+Sales, Manager and Admin use one backend on **port4000**. The frontend’s development selector switches a signed session on that backend; no Manager/Admin API URL variables or separate role servers are required. See [single-backend setup, including Windows](frontend/docs/single-backend-setup.md). Use `NODE_ENV=development` and `DEV_AUTH_ENABLED=true` for local demo switching; production uses trusted authentication.
+
 ## Run the backend
 
 In one terminal, from the repository root:

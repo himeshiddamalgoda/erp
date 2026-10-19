@@ -33,13 +33,13 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { useDevelopmentWorkspace } from "@/features/development-session/context";
 import { API } from "@/constants/api";
 import { ROUTES } from "@/constants/routes";
 import { initials } from "@/utils/format";
 import {
   setMobileNavOpen,
   toggleOrders,
-  setWorkspace,
   setEditorDirty,
 } from "@/store/ui-slice";
 import styles from "./app-shell.module.css";
@@ -52,6 +52,7 @@ export function AppShell({
   refreshing = false,
 }) {
   const dispatch = useDispatch();
+  const { switchWorkspace, switching } = useDevelopmentWorkspace();
   const { mobileNavOpen, ordersExpanded, workspace, editorDirty } = useSelector(
     (s) => s.ui,
   );
@@ -92,7 +93,7 @@ export function AppShell({
   const selectWorkspace = (value) => {
     if (value === workspace) return;
     if (editorDirty) setNextWorkspace(value);
-    else dispatch(setWorkspace(value));
+    else switchWorkspace(value);
   };
   const nav = (
     <div className={styles.sidebarInner}>
@@ -253,21 +254,18 @@ export function AppShell({
             )}
           </div>
           <div className={styles.headerRight}>
-            {API.demoWorkspaces && (API.manager || API.admin) && (
+            {API.demoWorkspaces && (
               <Select
                 size="small"
                 value={workspace}
+                disabled={switching}
                 onChange={(e) => selectWorkspace(e.target.value)}
                 inputProps={{ "aria-label": "Development workspace" }}
                 className={styles.workspaceSelect}
               >
                 <MenuItem value="sales">Sales workspace</MenuItem>
-                {API.manager && (
-                  <MenuItem value="manager">Manager workspace</MenuItem>
-                )}
-                {API.admin && (
-                  <MenuItem value="admin">Admin workspace</MenuItem>
-                )}
+                <MenuItem value="manager">Manager workspace</MenuItem>
+                <MenuItem value="admin">Admin workspace</MenuItem>
               </Select>
             )}
             <Tooltip title={`${section} workspace`}>
@@ -351,7 +349,7 @@ export function AppShell({
             color="error"
             variant="contained"
             onClick={() => {
-              dispatch(setWorkspace(nextWorkspace));
+              switchWorkspace(nextWorkspace);
               setNextWorkspace(null);
             }}
           >

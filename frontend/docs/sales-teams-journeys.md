@@ -74,4 +74,4 @@ npm run build
 TEST_DB_NAME=erp_sales_teams_test npm run test:e2e
 ```
 
-Playwright starts isolated Sales/Manager/Admin API processes on 4310–4312 and redirects browser requests there. It does not reset the development database. Team tests create unique records and cover create/edit/history, archive/reactivate, lost-response replay, stale edits, blocked removal → customer transfer → successful removal, scoped read-only UI and mobile layout. Unit checks cover full-set semantics, permission separation, hidden blockers, filter normalization and service request contracts.
+Playwright redirects the single browser API origin to an isolated test backend; development session cookies switch browser identities. Additional isolated fixture servers are used only by test setup requests. It does not reset the development database. Team tests create unique records and cover create/edit/history, archive/reactivate, lost-response replay, stale edits, blocked removal → customer transfer → successful removal, scoped read-only UI and mobile layout. Unit checks cover full-set semantics, permission separation, hidden blockers, filter normalization and service request contracts.

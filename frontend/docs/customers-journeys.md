@@ -4,26 +4,9 @@ Open **Orders → Customers** at `http://localhost:3000/orders/customers`.
 
 The implementation uses the existing Next.js/React application, MUI components, shared CSS variables, Axios feature services, page-owned TanStack Query hooks, React Hook Form with Zod/resolver validation, and Redux Toolkit for workspace/navigation/dirty-form state. No new package is required. Server data stays in query caches scoped by backend URL and customer ID; inactive-inclusive detail has a separate cache key.
 
-## Local testing access
+## Local setup
 
-The existing Sales4000 and Manager4101 instances read permitted customer data. Customer master writes need Admin or a trusted `customers:write` capability; assignment changes additionally need `customers:assign`. UI permissions use the server-provided actor and `allowedActions`; the backend rechecks every action.
-
-In `frontend/.env.local`:
-
-```ini
-NEXT_PUBLIC_API_URL=http://localhost:4000
-NEXT_PUBLIC_MANAGER_API_URL=http://localhost:4101
-NEXT_PUBLIC_ADMIN_API_URL=http://localhost:4102
-NEXT_PUBLIC_ENABLE_DEMO_WORKSPACES=true
-```
-
-Run the Admin development server from `backend/`:
-
-```sh
-HOST=127.0.0.1 PORT=4102 NODE_ENV=development DEV_AUTH_ENABLED=true DEV_ACTOR=admin npm start
-```
-
-Run `npm run dev` from `frontend/`, then choose **Admin workspace** in the header for create/edit/archive/reactivate. A full browser reload resets the development workspace to Sales; select Admin again when resuming a create retry. The pending attempt remains isolated to the original backend/actor. Demo workspace URLs do not send actor/role headers and are disabled in production. Production uses the actual authenticated upstream principal on its configured backend.
+Follow [single-backend setup](single-backend-setup.md). Use one API on port4000 and select Admin in the header for customer master writes. Sales/Manager reads remain scoped; role and assignment capabilities are still checked by the backend. No extra backend ports are needed.
 
 ## Screens and requests
 

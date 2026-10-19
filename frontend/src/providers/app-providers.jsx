@@ -12,6 +12,7 @@ import { AppRouterCacheProvider } from "@mui/material-nextjs/v16-appRouter";
 import { makeStore } from "@/store/store";
 import { makeQueryClient } from "@/lib/query-client";
 import { theme } from "@/lib/theme";
+import { DevelopmentWorkspaceBoundary } from "@/features/development-session/pages/development-workspace-boundary";
 import { dismissNotice } from "@/store/ui-slice";
 function Notifications() {
   const notice = useSelector((s) => s.ui.notice);
@@ -44,7 +45,9 @@ export function AppProviders({ children }) {
         <CssBaseline />
         <ReduxProvider store={store}>
           <QueryClientProvider client={queryClient}>
-            {children}
+            <DevelopmentWorkspaceBoundary>
+              {children}
+            </DevelopmentWorkspaceBoundary>
             <Notifications />
           </QueryClientProvider>
         </ReduxProvider>

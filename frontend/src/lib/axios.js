@@ -7,6 +7,7 @@ export function getHttpClient(baseURL) {
     const client = axios.create({
       baseURL,
       timeout: API.timeout,
+      withCredentials: true,
       headers: { Accept: "application/json" },
     });
     client.interceptors.response.use(

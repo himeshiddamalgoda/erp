@@ -1,3 +1,4 @@
+import { readDevelopmentWorkspace } from "../modules/development-session/development-session.js";
 import { env, assertAuthConfiguration } from "../config/env.js";
 import { AppError } from "../shared/errors.js";
 export const demoIds = {
@@ -19,14 +20,15 @@ const validId = (value) =>
   );
 export function authContext(req, _res, next) {
   assertAuthConfiguration();
-  // No actor headers. A trusted upstream adapter may set req.user before this router.
+  // Trusted authentication wins. Signed local demo sessions are development-only.
   if (!req.user && env.developmentAuth) {
+    const workspace = readDevelopmentWorkspace(req) || env.developmentActor;
     const role = {
       sales: "Sales",
       manager: "SalesManager",
       admin: "Admin",
       viewer: "Viewer",
-    }[env.developmentActor];
+    }[workspace];
     if (!role)
       return next(
         new AppError(
@@ -36,7 +38,7 @@ export function authContext(req, _res, next) {
         ),
       );
     req.user = {
-      id: demoIds[env.developmentActor],
+      id: demoIds[workspace],
       role,
       salesTeamIds: [demoIds.team],
     };

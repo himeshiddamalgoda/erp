@@ -1,3 +1,4 @@
+import { developmentSessionRoutes } from "./modules/development-session/development-session.js";
 import { salesTeamRoutes } from "./modules/sales-teams/sales-team.routes.js";
 import {
   assignmentRoutes,
@@ -28,6 +29,7 @@ export function createApp({
   app.use(
     cors({
       origin: process.env.FRONTEND_URL || "http://localhost:3000",
+      credentials: true,
       exposedHeaders: ["Content-Disposition", "X-Request-Id"],
     }),
   );
@@ -38,6 +40,7 @@ export function createApp({
   });
   app.use(express.json({ limit: "1mb" }));
   if (principalMiddleware) app.use(principalMiddleware);
+  app.use("/api/v1/dev/session", developmentSessionRoutes());
   app.use("/api/v1/quotations", quotationRoutes(context.service));
   app.use("/api/v1/reference-data", referenceDataRoutes(context));
   app.use("/api/v1/sales-orders", salesOrderRoutes(context.salesOrders));

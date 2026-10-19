@@ -4,22 +4,7 @@ Open **Orders -> Sales orders** at http://localhost:3000/orders/sales-orders. Th
 
 ## Local setup
 
-Apply the backend migrations and seed the master data using [backend setup](../../backend/docs/sales-orders.md). The regular Sales backend runs on port 4000. For manager actions start another backend against the same development database:
-
-```sh
-cd backend
-PORT=4101 DEV_AUTH_ENABLED=true DEV_ACTOR=manager npm start
-```
-
-Keep these values in `frontend/.env.local` and restart the Next development server if they change:
-
-```ini
-NEXT_PUBLIC_API_URL=http://localhost:4000
-NEXT_PUBLIC_MANAGER_API_URL=http://localhost:4101
-NEXT_PUBLIC_ENABLE_DEMO_WORKSPACES=true
-```
-
-Run `npm run dev` in `frontend/`. Select **Sales workspace** or **Manager workspace** from the header. The backend supplies the trusted identity; the selector never sends actor/role headers. This helper is available only during development. Production authentication remains a host/backend integration responsibility.
+Follow [single-backend setup](single-backend-setup.md). Sales, Manager and Admin use one backend on port4000 and the header selector changes the development session. No Manager/Admin API URL variables or extra backend processes are required. Production uses trusted authentication.
 
 ## Screens and API requests
 

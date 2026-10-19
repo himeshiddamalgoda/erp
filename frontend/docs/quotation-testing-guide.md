@@ -4,39 +4,7 @@ This guide follows the implemented frontend and backend. It explains what to cli
 
 ## 1. Open the test workspace
 
-- Frontend: http://localhost:3000/orders/quotations
-- Sales API base: http://localhost:4000/api/v1
-- Manager API base, if started: http://localhost:4101/api/v1
-- Backend readiness: http://localhost:4000/api/ready
-
-`/api/v1` is a prefix, so opening that URL alone can return route not found. Use `/api/v1/quotations` for the resource.
-
-### Enable the two local actors
-
-The Sales backend must use these **backend** environment variables:
-
-```ini
-DEV_AUTH_ENABLED=true
-DEV_ACTOR=sales
-```
-
-Restart the Sales backend after environment changes. For a second backend, run from `backend/`, against the same development database:
-
-```sh
-PORT=4101 DEV_AUTH_ENABLED=true DEV_ACTOR=manager npm start
-```
-
-In **frontend** `.env.local`:
-
-```ini
-NEXT_PUBLIC_API_URL=http://localhost:4000
-NEXT_PUBLIC_MANAGER_API_URL=http://localhost:4101
-NEXT_PUBLIC_ENABLE_DEMO_WORKSPACES=true
-```
-
-Restart `npm run dev` in `frontend/`. The header then offers **Sales workspace** and **Manager workspace**. This selector connects to two different servers; it does not send actor headers. It is available only in development. A Sales user cannot approve their own submitted quote; use the separate Manager identity.
-
-If ports 3000, 4000 and 4101 are already serving the configured applications, use those running instances rather than launching duplicates. For database setup, see [backend setup](../../backend/docs/quotations.md).
+Use http://localhost:3000/orders/quotations and a single API at http://localhost:4000/api/v1 for Sales, Manager and Admin. Follow [single-backend setup](single-backend-setup.md). Select the role in the header; the backend stores the selected development identity in a signed HttpOnly cookie. No additional ports or actor headers are required. The approver must differ from the submitter.
 
 ### Watch the actual API calls
 
@@ -163,7 +131,7 @@ Use the actual latest version, not always `1`. Expect **200**, `status: "Pending
 
 ### A3. Approve as Manager
 
-Switch to **Manager workspace** while viewing the same quotation ID. The server URL changes to port 4101; detail is refreshed for that actor.
+Switch to **Manager workspace** while viewing the same quotation ID. The API stays on port 4000; the development session changes and detail is refreshed for that actor.
 
 Click **Approve quotation**. Optionally enter review comment `Pricing checked`, then confirm:
 

@@ -23,23 +23,13 @@ NEXT_PUBLIC_API_URL=http://localhost:4000
 
 An origin or a URL ending in `/api/v1` is accepted. `/api/v1` itself is a prefix, not a resource; the list is `GET /api/v1/quotations`. Public variables are included at build time. Do not place secrets in them. Restart Next after changes.
 
-### Test manager approval locally
+### Switch Sales, Manager and Admin on one backend
 
-The backend determines the actor. The frontend does not send role or actor impersonation headers. Optionally start a second local backend against the same development database:
+All workspaces use `http://localhost:4000/api/v1`. No Manager/Admin API URLs or additional backend processes are needed. Configure backend `.env` with `NODE_ENV=development`, `DEV_AUTH_ENABLED=true`, `DEV_ACTOR=sales`, `PORT=4000` and `FRONTEND_URL=http://localhost:3000`. Keep `NEXT_PUBLIC_API_URL=http://localhost:4000` and `NEXT_PUBLIC_ENABLE_DEMO_WORKSPACES=true` in frontend `.env.local`. Rebuild the Docker backend and restart Next after configuration changes.
 
-```sh
-cd backend
-PORT=4101 DEV_AUTH_ENABLED=true DEV_ACTOR=manager npm start
-```
+The development selector uses `GET/POST /api/v1/dev/session` and a signed HttpOnly cookie. Switching clears the previous role’s query cache and retains the selected role across page reloads. The endpoints and selector are disabled in production; trusted authentication still supplies real production identities. Sales submits a quotation, Manager approves/rejects, then Sales issues it. Self-approval remains forbidden.
 
-Enable the development-only selector in `frontend/.env.local` and restart Next:
-
-```ini
-NEXT_PUBLIC_MANAGER_API_URL=http://localhost:4101
-NEXT_PUBLIC_ENABLE_DEMO_WORKSPACES=true
-```
-
-Select Sales to create/submit, Manager to approve/reject, then Sales to issue and record the buyer response. Each choice connects to its respective server. The selector is disabled in production builds. In production, integrate trusted authentication middleware on the backend and configure the matching browser credentials/token flow; this implementation does not add a login system.
+See [single-backend setup for Windows and other systems](docs/single-backend-setup.md).
 
 ## Screens and API journeys
 
@@ -125,7 +115,7 @@ npx playwright install chromium
 TEST_DB_NAME=erp_quotation_test npm run test:e2e
 ```
 
-The Playwright configuration starts Sales and Manager test APIs on ports 4310 and 4311. Browser requests are routed to those APIs. If reusing an existing Next development server, start it with `NEXT_PUBLIC_API_URL=http://localhost:4000`, `NEXT_PUBLIC_MANAGER_API_URL=http://localhost:4101` and `NEXT_PUBLIC_ENABLE_DEMO_WORKSPACES=true`. Tests exercise six garment lines, approval, PDF bytes, acceptance, conversion after a lost response, stale edits, deletion, revision/supersession, decline, void, withdrawal, rejection and mobile navigation. Screenshots and failure traces are written to ignored `test-results/`.
+The Playwright configuration routes all browser API requests from port4000 to one isolated test API. The workspace selector changes development sessions on that API. Separate fixture APIs prepare test records. If reusing an existing Next development server, start it with `NEXT_PUBLIC_API_URL=http://localhost:4000` and `NEXT_PUBLIC_ENABLE_DEMO_WORKSPACES=true`. Tests exercise six garment lines, approval, PDF bytes, acceptance, conversion after a lost response, stale edits, deletion, revision/supersession, decline, void, withdrawal, rejection and mobile navigation. Screenshots and failure traces are written to ignored `test-results/`.
 
 ## Sales Orders frontend
 
@@ -137,7 +127,7 @@ Create/confirm/amendment retain the original key and body for uncertain-outcome 
 
 ## Customers
 
-Customers list/create/profile/edit screens are available under **Orders → Customers**. All six Customers APIs are integrated, including nested contacts/addresses, archive/reactivate reason dialogs, scoped commercial history, blocker recovery, create idempotency and version conflicts. See [screen/API journeys and test setup](docs/customers-journeys.md). Add `NEXT_PUBLIC_ADMIN_API_URL=http://localhost:4102` with development workspaces enabled and run an Admin backend on4102 for local master-data writes. Sales/manager customer access stays read-only. Production uses its authenticated backend principal.
+Customers list/create/profile/edit screens are available under **Orders → Customers**. All six Customers APIs are integrated, including nested contacts/addresses, archive/reactivate reason dialogs, scoped commercial history, blocker recovery, create idempotency and version conflicts. See [screen/API journeys and test setup](docs/customers-journeys.md). Enable development workspaces and select Admin on the same backend4000 for local master-data writes. Sales/manager customer access stays read-only. Production uses its authenticated backend principal.
 
 ## Sales teams
 
