@@ -42,6 +42,8 @@ export async function seedDemo(context) {
     await insert("customers", {
       id: ids.customer,
       code: "OCEAN",
+      createdBy: ids.admin,
+      updatedBy: ids.admin,
       name: "Ocean Apparel",
       country: "US",
       currency: "USD",

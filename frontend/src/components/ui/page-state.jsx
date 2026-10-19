@@ -18,7 +18,13 @@ export function LoadingState({ label = "Loading workspace…" }) {
     </div>
   );
 }
-export function ErrorState({ error, onRetry, title }) {
+export function ErrorState({
+  error,
+  onRetry,
+  title,
+  backHref = ROUTES.quotations,
+  backLabel = "Back to quotations",
+}) {
   const denied = [401, 403, 404].includes(error?.status);
   return (
     <div className={styles.errorState}>
@@ -45,16 +51,16 @@ export function ErrorState({ error, onRetry, title }) {
         )}
         <Button
           component={Link}
-          href={ROUTES.quotations}
+          href={backHref}
           startIcon={<ArrowLeft size={16} />}
         >
-          Back to quotations
+          {backLabel}
         </Button>
       </div>
     </div>
   );
 }
-export function ApiErrorAlert({ error, children }) {
+export function ApiErrorAlert({ error, children, resource = "quotation" }) {
   if (!error) return null;
   return (
     <Alert
@@ -63,7 +69,7 @@ export function ApiErrorAlert({ error, children }) {
     >
       <AlertTitle>
         {error.code === "STALE_VERSION"
-          ? "This quotation has changed"
+          ? `This ${resource} has changed`
           : error.code === "FAMILY_ALREADY_ACCEPTED"
             ? "This quotation family is locked"
             : "We couldn’t complete this action"}

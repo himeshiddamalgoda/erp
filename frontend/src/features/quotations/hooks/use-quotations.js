@@ -12,7 +12,7 @@ export const quotationKeys = {
   list: (base, filters) => ["quotations", base, "list", filters],
   detail: (base, id) => ["quotations", base, "detail", id],
 };
-export function useQuotations(base, filters) {
+export function useQuotations(base, filters, options = {}) {
   const params = Object.fromEntries(
     Object.entries(filters).filter(([, v]) => v !== "" && v !== undefined),
   );
@@ -21,6 +21,7 @@ export function useQuotations(base, filters) {
     staleTime: 0,
     queryFn: ({ signal }) => service.listQuotations(base, params, signal),
     placeholderData: keepPreviousData,
+    ...options,
   });
 }
 export function useQuotation(base, id, options = {}) {

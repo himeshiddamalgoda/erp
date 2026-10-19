@@ -1,4 +1,16 @@
+import {
+  customerExtensions,
+  contactExtensions,
+  addressExtensions,
+  customerTables,
+  customerIndexes,
+} from "./customer-schema.js";
 import { DataTypes as D } from "sequelize";
+import {
+  orderExtensions,
+  orderTables,
+  orderIndexes,
+} from "./sales-order-schema.js";
 const str = (n) => D.STRING(n);
 const col = (type, extra = {}) => ({ type, allowNull: false, ...extra });
 const optional = (type) => col(type, { allowNull: true });
@@ -238,11 +250,26 @@ export const snake = (name) =>
   name.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
 export function defineModels(sequelize) {
   const models = Object.fromEntries(
-    Object.entries(schemas).map(([table, attributes]) => [
+    Object.entries({
+      ...schemas,
+      customers: { ...schemas.customers, ...customerExtensions },
+      customer_contacts: { ...schemas.customer_contacts, ...contactExtensions },
+      customer_addresses: {
+        ...schemas.customer_addresses,
+        ...addressExtensions,
+      },
+      ...customerTables,
+      sales_orders: { ...schemas.sales_orders, ...orderExtensions },
+      ...orderTables,
+    }).map(([table, attributes]) => [
       table,
       sequelize.define(table, attributes, {
         timestamps: false,
-        indexes: indexes[table] || [],
+        indexes: [
+          ...(indexes[table] || []),
+          ...(orderIndexes[table] || []),
+          ...(customerIndexes[table] || []),
+        ],
       }),
     ]),
   );
@@ -256,6 +283,22 @@ export function defineModels(sequelize) {
     models.audit_events.addHook(hook, () => {
       throw new Error("Audit events are append only");
     });
+  }
+  for (const table of [
+    "sales_order_revisions",
+    "fulfilment_events",
+    "fulfilment_event_lines",
+  ]) {
+    for (const hook of [
+      "beforeUpdate",
+      "beforeBulkUpdate",
+      "beforeDestroy",
+      "beforeBulkDestroy",
+      "beforeUpsert",
+    ])
+      models[table].addHook(hook, () => {
+        throw new Error(`${table} is append only`);
+      });
   }
   return models;
 }

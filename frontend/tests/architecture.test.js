@@ -19,13 +19,18 @@ describe("page-owned API architecture", () => {
   it("keeps HTTP and TanStack fetching out of reusable components", async () => {
     const paths = (
       await Promise.all(
-        ["src/components", "src/features/quotations/components"].map(files),
+        [
+          "src/components",
+          "src/features/quotations/components",
+          "src/features/sales-orders/components",
+          "src/features/customers/components",
+        ].map(files),
       )
     ).flat();
     for (const path of paths) {
       const source = await readFile(path, "utf8");
       expect(source, path).not.toMatch(
-        /from\s+['"](?:axios|@tanstack\/react-query|[^'"]*\/services\/|[^'"]*\/hooks\/use-quotation)/,
+        /from\s+['"](?:axios|@tanstack\/react-query|[^'"]*\/services\/|[^'"]*\/hooks\/use-(?:quotation|sales-order|customer))/,
       );
       expect(source, path).not.toMatch(/\bfetch\s*\(/);
     }

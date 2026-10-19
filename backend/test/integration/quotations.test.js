@@ -33,7 +33,9 @@ if (
 test("MySQL quotations HTTP integration", { skip }, async (t) => {
   const originalDevelopmentAuth = env.developmentAuth;
   env.developmentAuth = false;
-  t.after(() => { env.developmentAuth = originalDevelopmentAuth; });
+  t.after(() => {
+    env.developmentAuth = originalDevelopmentAuth;
+  });
   const db = createSequelize({ database: databaseName });
   const context = createQuotationContext(db);
   const m = context.models;
@@ -494,7 +496,13 @@ test("MySQL quotations HTTP integration", { skip }, async (t) => {
     async () => {
       const q = await pending();
       await m.customers.update(
-        { name: "Changed buyer", isActive: false },
+        {
+          name: "Changed buyer",
+          isActive: false,
+          archivedAt: new Date(),
+          archivedBy: ids.admin,
+          archiveReason: "Test fixture inactive buyer",
+        },
         { where: { id: ids.customer } },
       );
       await m.styles.update(
@@ -514,7 +522,13 @@ test("MySQL quotations HTTP integration", { skip }, async (t) => {
         );
       } finally {
         await m.customers.update(
-          { name: "Ocean Apparel", isActive: true },
+          {
+            name: "Ocean Apparel",
+            isActive: true,
+            archivedAt: null,
+            archivedBy: null,
+            archiveReason: null,
+          },
           { where: { id: ids.customer } },
         );
         await m.styles.update(

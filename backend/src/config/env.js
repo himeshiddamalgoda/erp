@@ -1,5 +1,11 @@
 import "dotenv/config";
 export const env = {
+  countries: (
+    process.env.COMPANY_COUNTRIES || "US,LK,GB,DE,FR,IN,BD,CN,PK,VN,AU,CA"
+  )
+    .split(",")
+    .map((code) => code.trim().toUpperCase())
+    .filter(Boolean),
   timezone: process.env.COMPANY_TIMEZONE || "Asia/Colombo",
   sellerName: process.env.COMPANY_NAME || "Garment ERP",
   developmentAuth: process.env.DEV_AUTH_ENABLED === "true",

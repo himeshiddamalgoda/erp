@@ -75,3 +75,11 @@ Regenerate the files after changing the generator:
 ```sh
 node scripts/generate-postman.js
 ```
+
+## Sales Orders collection
+
+Import `sales-orders.postman_collection.json`. Start fixed Sales and Manager backends on ports 4000 and 4101, then run folder 1 in order: lookups, direct Draft, edit, confirm, hold, operational amendment, resume. Variables store the returned order ID/version and lookup business date. Folder 2 reads the list, delivery, history and PDFs. For folder 3, first run the private CLI partial/full delivery fixtures, refresh detail, then close. Folder 4 contains alternative cancel/delete actions for a separate disposable order; do not run both on the same terminal order. See [the Sales Orders guide](../sales-orders.md). No actor headers or public fixture endpoints are used. Unknown transport/5xx outcomes retain the original idempotency key and body in a collection variable; retry sends both unchanged. Definitive responses clear that attempt.
+
+## Customers
+
+Import [customers.postman_collection.json](customers.postman_collection.json). Exactly six requests cover list/create/detail/PATCH/archive/reactivate. Default `baseUrl` is `http://127.0.0.1:4102/api/v1`, an Admin development instance; the Sales4000 server cannot write Customers by default. See [setup and journeys](../customers-verification.md). Returned IDs, warehouse IDs and versions are captured automatically. Keep the same idempotency key on create retries; use a new key for an intentionally separate buyer.

@@ -213,7 +213,15 @@ export function QuotationSidebar({ quotation }) {
             <span className={styles.infoLabel}>
               <Link2 size={12} /> LINKED SALES ORDER
             </span>
-            <h3>{quotation.linkedOrder.orderNumber}</h3>
+            <h3>
+              {quotation.linkedOrder.archived ? (
+                quotation.linkedOrder.orderNumber
+              ) : (
+                <Link href={ROUTES.salesOrder(quotation.linkedOrder.id)}>
+                  {quotation.linkedOrder.orderNumber}
+                </Link>
+              )}
+            </h3>
             <StatusBadge
               status={
                 quotation.linkedOrder.archived

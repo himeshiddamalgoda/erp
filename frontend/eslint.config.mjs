@@ -46,6 +46,7 @@ export default defineConfig([
               group: [
                 "**/services/**",
                 "**/hooks/use-quotation*",
+                "**/hooks/use-sales-order*",
                 "@/lib/axios",
               ],
               message:

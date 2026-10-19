@@ -7,12 +7,17 @@ export const API = {
   manager: process.env.NEXT_PUBLIC_MANAGER_API_URL
     ? baseUrl(process.env.NEXT_PUBLIC_MANAGER_API_URL.replace(/\/+$/, ""))
     : "",
+  admin: process.env.NEXT_PUBLIC_ADMIN_API_URL
+    ? baseUrl(process.env.NEXT_PUBLIC_ADMIN_API_URL.replace(/\/+$/, ""))
+    : "",
   demoWorkspaces:
     process.env.NODE_ENV !== "production" &&
     process.env.NEXT_PUBLIC_ENABLE_DEMO_WORKSPACES === "true",
   timeout: 20000,
 };
 export const getApiBaseUrl = (workspace) =>
-  workspace === "manager" && API.demoWorkspaces && API.manager
-    ? API.manager
-    : API.sales;
+  workspace === "admin" && API.demoWorkspaces && API.admin
+    ? API.admin
+    : workspace === "manager" && API.demoWorkspaces && API.manager
+      ? API.manager
+      : API.sales;

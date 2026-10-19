@@ -47,7 +47,7 @@ import styles from "./app-shell.module.css";
 export function AppShell({
   children,
   actor,
-  breadcrumb = "Quotations",
+  breadcrumb,
   onRefresh,
   refreshing = false,
 }) {
@@ -57,6 +57,19 @@ export function AppShell({
   );
   const pathname = usePathname();
   const router = useRouter();
+  const isSalesOrders = pathname.startsWith(ROUTES.salesOrders);
+  const isCustomers = pathname.startsWith(ROUTES.customers);
+  const section = isCustomers
+    ? "Customers"
+    : isSalesOrders
+      ? "Sales orders"
+      : "Quotations";
+  const sectionHref = isCustomers
+    ? ROUTES.customers
+    : isSalesOrders
+      ? ROUTES.salesOrders
+      : ROUTES.quotations;
+  breadcrumb = breadcrumb || section;
   const [pendingNavigation, setPendingNavigation] = useState(null);
   const navigate = (event) => {
     if (
@@ -67,7 +80,7 @@ export function AppShell({
       event.button === 0
     ) {
       event.preventDefault();
-      setPendingNavigation(ROUTES.quotations);
+      setPendingNavigation(event.currentTarget.getAttribute("href"));
     } else dispatch(setMobileNavOpen(false));
   };
   const [nextWorkspace, setNextWorkspace] = useState(null);
@@ -124,23 +137,39 @@ export function AppShell({
             aria-current={
               pathname.startsWith(ROUTES.quotations) ? "page" : undefined
             }
-            className={styles.navActive}
+            className={
+              isSalesOrders || isCustomers ? styles.navLink : styles.navActive
+            }
             onClick={navigate}
           >
             <FileText size={16} />
             <span>Quotations</span>
-            <span className={styles.activeIndicator} />
+            {!isSalesOrders && !isCustomers && (
+              <span className={styles.activeIndicator} />
+            )}
           </Link>
-          <button className={styles.subnavDisabled} disabled>
-            Sales orders<span className={styles.soon}>Soon</span>
-          </button>
+          <Link
+            href={ROUTES.salesOrders}
+            onClick={navigate}
+            className={isSalesOrders ? styles.navActive : styles.navLink}
+            aria-current={isSalesOrders ? "page" : undefined}
+          >
+            <Box size={16} />
+            <span>Sales orders</span>
+            {isSalesOrders && <span className={styles.activeIndicator} />}
+          </Link>
+          <Link
+            href={ROUTES.customers}
+            onClick={navigate}
+            className={isCustomers ? styles.navActive : styles.navLink}
+            aria-current={isCustomers ? "page" : undefined}
+          >
+            <Users size={16} />
+            <span>Customers</span>
+            {isCustomers && <span className={styles.activeIndicator} />}
+          </Link>
         </div>
       </Collapse>
-      <button className={styles.navItem} disabled>
-        <Users size={18} />
-        <span>Customers</span>
-        <span className={styles.soon}>Soon</span>
-      </button>
       <button className={styles.navItem} disabled>
         <Shirt size={18} />
         <span>Style library</span>
@@ -196,10 +225,10 @@ export function AppShell({
             </span>
             <span className={styles.crumbRoot}>Orders</span>
             <ChevronRight size={13} />
-            <Link href={ROUTES.quotations} onClick={navigate}>
-              Quotations
+            <Link href={sectionHref} onClick={navigate}>
+              {section}
             </Link>
-            {breadcrumb !== "Quotations" && (
+            {breadcrumb !== section && (
               <>
                 <ChevronRight size={13} />
                 <span className={styles.currentCrumb}>{breadcrumb}</span>
@@ -207,7 +236,7 @@ export function AppShell({
             )}
           </div>
           <div className={styles.headerRight}>
-            {API.demoWorkspaces && API.manager && (
+            {API.demoWorkspaces && (API.manager || API.admin) && (
               <Select
                 size="small"
                 value={workspace}
@@ -216,10 +245,15 @@ export function AppShell({
                 className={styles.workspaceSelect}
               >
                 <MenuItem value="sales">Sales workspace</MenuItem>
-                <MenuItem value="manager">Manager workspace</MenuItem>
+                {API.manager && (
+                  <MenuItem value="manager">Manager workspace</MenuItem>
+                )}
+                {API.admin && (
+                  <MenuItem value="admin">Admin workspace</MenuItem>
+                )}
               </Select>
             )}
-            <Tooltip title="Quotations workspace">
+            <Tooltip title={`${section} workspace`}>
               <span className={styles.helpIcon}>
                 <HelpCircle size={18} />
               </span>
@@ -257,10 +291,12 @@ export function AppShell({
         open={Boolean(pendingNavigation)}
         onClose={() => setPendingNavigation(null)}
       >
-        <DialogTitle>Leave this draft?</DialogTitle>
+        <DialogTitle>
+          {isCustomers ? "Leave this customer form?" : "Leave this draft?"}
+        </DialogTitle>
         <DialogContent>
-          Your unsaved changes will be lost. Save the draft before leaving if
-          you want to return to these edits.
+          Your unsaved changes will be lost. Save before leaving if you want to
+          return to these edits.
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPendingNavigation(null)}>
@@ -286,7 +322,7 @@ export function AppShell({
       >
         <DialogTitle>Switch workspace?</DialogTitle>
         <DialogContent>
-          You have unsaved changes. Switching will close this draft form.
+          You have unsaved changes. Switching will close the current form.
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setNextWorkspace(null)}>Keep editing</Button>

@@ -22,11 +22,17 @@ export function referenceDataRoutes(context) {
           displayName: user.displayName,
           role: req.user.role,
           salesTeamIds: req.user.salesTeamIds,
+          capabilities: Array.isArray(req.user.capabilities)
+            ? req.user.capabilities.filter((c) =>
+                ["customers:write", "customers:assign"].includes(c),
+              )
+            : [],
         },
         company: {
           timezone: env.timezone,
           businessDate: businessDate(),
           currencies: ["USD", "LKR", "GBP", "EUR"],
+          countries: env.countries,
         },
         ...options,
       },

@@ -1,0 +1,263 @@
+{
+  "info": {
+    "name": "Garment ERP · Customers (6 APIs)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Run in order against an Admin development server. No tokens or role headers. Default main4000 Sales server is read-only for Customers; use a separately configured Admin server4102. Preserve the idempotency key when retrying. GET /api/v1 alone has no route."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:4102/api/v1"
+    },
+    {
+      "key": "customerId",
+      "value": ""
+    },
+    {
+      "key": "version",
+      "value": "1"
+    },
+    {
+      "key": "idempotencyKey",
+      "value": "customers-postman-create-v1"
+    },
+    {
+      "key": "salesTeamId",
+      "value": "20000000-0000-4000-8000-000000000001"
+    },
+    {
+      "key": "ownerId",
+      "value": "10000000-0000-4000-8000-000000000001"
+    },
+    {
+      "key": "warehouseAId",
+      "value": ""
+    },
+    {
+      "key": "warehouseBId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1 · List Active customers",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/customers?status=Active&page=1&pageSize=20",
+        "description": "Orders > Customers. Sales/manager/viewer can read within team scope."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Successful response',()=>pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+              "if (pm.response.code >= 200 && pm.response.code < 300) {",
+              " const data=pm.response.json().data;",
+              " if (data && data.id) {pm.collectionVariables.set('customerId',data.id);pm.collectionVariables.set('version',String(data.version));}",
+              " if (data && data.addresses) for (const a of data.addresses) {if(a.label==='Warehouse A')pm.collectionVariables.set('warehouseAId',a.id);if(a.label==='Warehouse B')pm.collectionVariables.set('warehouseBId',a.id);}",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 · Create buyer (Save)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey}}"
+          }
+        ],
+        "url": "{{baseUrl}}/customers",
+        "description": "Use a fixed idempotencyKey for retries. Generate a NEW key only when intentionally creating another buyer. Saves returned customerId/version/warehouse IDs.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Ocean Apparel (Pvt) Ltd\",\n  \"displayName\": \"Ocean Apparel\",\n  \"country\": \"LK\",\n  \"currency\": \"USD\",\n  \"paymentTerms\": \"30% advance; 70% before shipment\",\n  \"salesTeamId\": \"{{salesTeamId}}\",\n  \"ownerId\": \"{{ownerId}}\",\n  \"email\": \"office@example.test\",\n  \"phone\": \"+94 11 234 5678\",\n  \"website\": \"https://example.test\",\n  \"registrationNumber\": \"DEMO-PV-001\",\n  \"internalNotes\": \"Prefers colour-and-size packing breakdowns\",\n  \"contacts\": [\n    {\n      \"name\": \"Nimal Silva\",\n      \"jobTitle\": \"Buyer\",\n      \"email\": \"buyer@example.test\",\n      \"phone\": \"+94 77 123 4567\",\n      \"primary\": true\n    }\n  ],\n  \"addresses\": [\n    {\n      \"addressType\": \"billing\",\n      \"label\": \"Head Office\",\n      \"line1\": \"14 Sample Road\",\n      \"city\": \"Colombo\",\n      \"country\": \"LK\",\n      \"isDefault\": true\n    },\n    {\n      \"addressType\": \"shipping\",\n      \"label\": \"Warehouse A\",\n      \"line1\": \"25 Sample Warehouse Road\",\n      \"city\": \"Colombo\",\n      \"country\": \"LK\",\n      \"isDefault\": true\n    },\n    {\n      \"addressType\": \"shipping\",\n      \"label\": \"Warehouse B\",\n      \"line1\": \"8 Sample Industrial Road\",\n      \"city\": \"Gampaha\",\n      \"country\": \"LK\"\n    }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Successful response',()=>pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+              "if (pm.response.code >= 200 && pm.response.code < 300) {",
+              " const data=pm.response.json().data;",
+              " if (data && data.id) {pm.collectionVariables.set('customerId',data.id);pm.collectionVariables.set('version',String(data.version));}",
+              " if (data && data.addresses) for (const a of data.addresses) {if(a.label==='Warehouse A')pm.collectionVariables.set('warehouseAId',a.id);if(a.label==='Warehouse B')pm.collectionVariables.set('warehouseBId',a.id);}",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 · Profile/edit detail",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/customers/{{customerId}}?includeInactiveChildren=true",
+        "description": "Refreshes current version. This GET is safe for archived buyers."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Successful response',()=>pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+              "if (pm.response.code >= 200 && pm.response.code < 300) {",
+              " const data=pm.response.json().data;",
+              " if (data && data.id) {pm.collectionVariables.set('customerId',data.id);pm.collectionVariables.set('version',String(data.version));}",
+              " if (data && data.addresses) for (const a of data.addresses) {if(a.label==='Warehouse A')pm.collectionVariables.set('warehouseAId',a.id);if(a.label==='Warehouse B')pm.collectionVariables.set('warehouseBId',a.id);}",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 · Switch default warehouse atomically",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/customers/{{customerId}}",
+        "description": "Explicit old false/new true in one request. IDs and omitted rows preserved.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"version\": {{version}},\n  \"addresses\": [\n    {\n      \"id\": \"{{warehouseAId}}\",\n      \"isDefault\": false\n    },\n    {\n      \"id\": \"{{warehouseBId}}\",\n      \"isDefault\": true\n    }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Successful response',()=>pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+              "if (pm.response.code >= 200 && pm.response.code < 300) {",
+              " const data=pm.response.json().data;",
+              " if (data && data.id) {pm.collectionVariables.set('customerId',data.id);pm.collectionVariables.set('version',String(data.version));}",
+              " if (data && data.addresses) for (const a of data.addresses) {if(a.label==='Warehouse A')pm.collectionVariables.set('warehouseAId',a.id);if(a.label==='Warehouse B')pm.collectionVariables.set('warehouseBId',a.id);}",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 · Archive with reason",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/customers/{{customerId}}/archive",
+        "description": "409 CUSTOMER_HAS_OPEN_DOCUMENTS when open quotations or Draft orders exist; show authorized blockers and preserve input.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"version\": {{version}},\n  \"reason\": \"Buyer account no longer used\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Successful response',()=>pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+              "if (pm.response.code >= 200 && pm.response.code < 300) {",
+              " const data=pm.response.json().data;",
+              " if (data && data.id) {pm.collectionVariables.set('customerId',data.id);pm.collectionVariables.set('version',String(data.version));}",
+              " if (data && data.addresses) for (const a of data.addresses) {if(a.label==='Warehouse A')pm.collectionVariables.set('warehouseAId',a.id);if(a.label==='Warehouse B')pm.collectionVariables.set('warehouseBId',a.id);}",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6 · Reactivate with reason",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/customers/{{customerId}}/reactivate",
+        "description": "Revalidates current master/ownership. Repair via PATCH first if 422.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"version\": {{version}},\n  \"reason\": \"Buyer resumed purchases\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Successful response',()=>pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+              "if (pm.response.code >= 200 && pm.response.code < 300) {",
+              " const data=pm.response.json().data;",
+              " if (data && data.id) {pm.collectionVariables.set('customerId',data.id);pm.collectionVariables.set('version',String(data.version));}",
+              " if (data && data.addresses) for (const a of data.addresses) {if(a.label==='Warehouse A')pm.collectionVariables.set('warehouseAId',a.id);if(a.label==='Warehouse B')pm.collectionVariables.set('warehouseBId',a.id);}",
+              "}"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

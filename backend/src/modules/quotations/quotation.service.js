@@ -1,3 +1,4 @@
+import { customerGuard } from "../../shared/customer-guard.js";
 import { randomUUID, createHash } from "node:crypto";
 import Decimal from "decimal.js";
 import { businessDate } from "../../config/env.js";
@@ -75,7 +76,10 @@ export class QuotationService {
       transaction: t,
       ...(t && lockMasters ? { lock: t.LOCK.SHARE } : {}),
     };
-    const customer = await this.r.findById("customers", q.customerId, options);
+    const customer =
+      t && lockMasters
+        ? await customerGuard(this.r, q.customerId, t)
+        : await this.r.findById("customers", q.customerId, options);
     const team = await this.r.findById("sales_teams", q.salesTeamId, options);
     const owner = await this.r.findById("users", q.ownerId, options);
     const membership = await this.r.one("sales_team_members", {
@@ -671,6 +675,8 @@ export class QuotationService {
         await this.familySave(family, { activeIssuedRevisionId: id }, t);
         values = { status: "Issued", issuedBy: actor.id, issuedAt: new Date() };
       } else if (action === "buyer-response") {
+        if (body.decision === "Accepted")
+          await customerGuard(this.r, q.customerId, t);
         if (q.status === "Expired")
           conflict("QUOTATION_EXPIRED", "Quotation validity has ended");
         requireState(["Issued"]);
@@ -717,6 +723,7 @@ export class QuotationService {
             "WORKING_REVISION_EXISTS",
             "Create a revision from the latest nondeleted eligible revision",
           );
+        await this.masters(q, t);
         const revision = family.latestRevisionNo + 1;
         newId = randomUUID();
         await this.familySave(family, { latestRevisionNo: revision }, t);
@@ -880,6 +887,10 @@ export class QuotationService {
           id: randomUUID(),
           orderNumber: await this.r.number("SALES_ORDER", t),
           sourceQuotationId: id,
+          orderDate: q.quotationDate,
+          billingAddressId: q.billingAddressId,
+          shippingAddressId: q.shippingAddressId,
+          internalNotes: q.notes,
           sourceQuoteNumber: family.quoteNumber,
           sourceRevisionNo: q.revisionNo,
           status: "Draft",
@@ -908,6 +919,22 @@ export class QuotationService {
       await this.r.audit(q, actor, "convert", "Accepted", null, requestId, t, {
         salesOrderId: order.id,
       });
+      await this.r.insert(
+        "audit_events",
+        {
+          id: randomUUID(),
+          entityType: "sales_order",
+          entityId: order.id,
+          actorId: actor.id,
+          action: "create",
+          fromStatus: null,
+          toStatus: "Draft",
+          metadata: { sourceQuotationId: id },
+          requestId: requestId || null,
+          createdAt: new Date(),
+        },
+        { transaction: t },
+      );
       const response = { data: orderSummary(order) };
       await this.r.save(
         reservation,

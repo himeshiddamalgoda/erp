@@ -1,3 +1,5 @@
+import { customerRoutes } from "./modules/customers/customer.routes.js";
+import { salesOrderRoutes } from "./modules/sales-orders/sales-order.routes.js";
 import { randomUUID } from "node:crypto";
 import { createQuotationContext } from "./db/context.js";
 import { referenceDataRoutes } from "./modules/reference-data/reference-data.routes.js";
@@ -33,6 +35,8 @@ export function createApp({
   if (principalMiddleware) app.use(principalMiddleware);
   app.use("/api/v1/quotations", quotationRoutes(context.service));
   app.use("/api/v1/reference-data", referenceDataRoutes(context));
+  app.use("/api/v1/sales-orders", salesOrderRoutes(context.salesOrders));
+  app.use("/api/v1/customers", customerRoutes(context.customers));
   app.locals.quotations = context;
 
   app.get("/api/health", (_request, response) => {

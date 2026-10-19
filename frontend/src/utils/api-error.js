@@ -5,9 +5,17 @@ export class ApiError extends Error {
     message = "Could not connect to the API. Check the connection and try again.",
     fields = {},
     requestId,
+    details,
   }) {
     super(message);
-    Object.assign(this, { name: "ApiError", status, code, fields, requestId });
+    Object.assign(this, {
+      name: "ApiError",
+      status,
+      code,
+      fields,
+      requestId,
+      details,
+    });
   }
 }
 export function toApiError(error) {
@@ -20,6 +28,7 @@ export function toApiError(error) {
       (error.code === "ECONNABORTED" ? "REQUEST_TIMEOUT" : "NETWORK_ERROR"),
     message: typeof payload === "string" ? payload : payload?.message,
     fields: payload?.fields || {},
+    details: payload?.details,
     requestId: payload?.requestId || error.response?.headers?.["x-request-id"],
   });
 }

@@ -98,3 +98,45 @@ test("database conflict responses hide SQL and internal constraint names", async
     assert.ok(response.body.error.requestId);
   }
 });
+
+test("Sales Orders OpenAPI matches exactly 15 implemented operations with full response types", async () => {
+  const api = await SwaggerParser.validate("docs/sales-orders.openapi.yaml");
+  const operations = Object.entries(api.paths).flatMap(([path, methods]) =>
+    Object.entries(methods)
+      .filter(([method]) =>
+        ["get", "post", "patch", "delete", "put"].includes(method),
+      )
+      .map(([method, op]) => ({ path, method, op })),
+  );
+  assert.equal(operations.length, 15);
+  assert.ok(operations.every(({ path }) => path.startsWith("/sales-orders")));
+  for (const { path, method, op } of operations) {
+    assert.ok(op.responses["500"]);
+    if (
+      method === "post" &&
+      (path === "/sales-orders" ||
+        path.endsWith("/confirm") ||
+        path.endsWith("/revisions"))
+    )
+      assert.ok(
+        op.parameters.some((p) => p.name === "Idempotency-Key" && p.required),
+      );
+  }
+  for (const field of [
+    "sourceQuotationId",
+    "buyerPoNumber",
+    "documentRevision",
+    "isOnHold",
+    "handoff",
+    "fulfilment",
+    "allowedActions",
+    "lines",
+    "internalNotes",
+  ])
+    assert.ok(api.components.schemas.OrderDetail.properties[field], field);
+  assert.ok(!api.components.schemas.DocumentSnapshot.properties.internalNotes);
+  const { salesOrderRoutes } =
+    await import("../src/modules/sales-orders/sales-order.routes.js");
+  const router = salesOrderRoutes({});
+  assert.equal(router.stack.filter((layer) => layer.route).length, 15);
+});

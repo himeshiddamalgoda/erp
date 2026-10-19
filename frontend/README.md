@@ -1,6 +1,6 @@
-# Quotation frontend
+# Orders frontend
 
-Next.js App Router with Material UI, Axios, TanStack Query, Redux Toolkit, React Hook Form and Zod. Open `/orders/quotations`; `/` redirects there.
+Next.js App Router with Material UI, Axios, TanStack Query, Redux Toolkit, React Hook Form and Zod. Open `/orders/quotations` or `/orders/sales-orders`; `/` redirects to Quotations.
 
 ## Start locally
 
@@ -45,26 +45,26 @@ Select Sales to create/submit, Manager to approve/reject, then Sales to issue an
 
 All paths below are relative to `/api/v1`.
 
-| Screen or action | API | Outcome |
-| --- | --- | --- |
-| Quotation list | `GET /quotations` | URL-backed search, status/buyer/owner/date filters, sorting, pagination, include revisions |
-| New quotation | `POST /quotations` | Create Draft with real buyer defaults and garment variants |
-| Details | `GET /quotations/:id` | Current version, server-authorized actions, snapshots, revisions and activity |
-| Edit Draft | `PATCH /quotations/:id` | Version-checked updates; conflicting edits preserve unsaved input |
-| Delete Draft | `DELETE /quotations/:id` | Soft-delete after confirmation |
-| Submit | `POST /quotations/:id/submit` | Draft → Pending approval |
-| Manager approval | `POST /quotations/:id/approve` | Pending approval → Approved |
-| Manager rejection | `POST /quotations/:id/reject` | Return to Draft with reason |
-| Withdraw | `POST /quotations/:id/withdraw` | Return pending submission to Draft with reason |
-| Issue | `POST /quotations/:id/issue` | Record manual issue; replacement can supersede prior offer |
-| Buyer response | `POST /quotations/:id/buyer-response` | Record acceptance or decline with evidence reference |
-| Revise | `POST /quotations/:id/revisions` | Create a new editable Draft; original remains until replacement is issued |
-| Void | `POST /quotations/:id/void` | Cancel eligible offer with reason |
-| Convert | `POST /quotations/:id/convert` | Accepted offer → one linked Draft sales order |
-| PDF | `GET /quotations/:id/pdf` | Download backend-generated offer PDF |
+| Screen or action              | API                                     | Outcome                                                                                                     |
+| ----------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Quotation list                | `GET /quotations`                       | URL-backed search, status/buyer/owner/date filters, sorting, pagination, include revisions                  |
+| New quotation                 | `POST /quotations`                      | Create Draft with real buyer defaults and garment variants                                                  |
+| Details                       | `GET /quotations/:id`                   | Current version, server-authorized actions, snapshots, revisions and activity                               |
+| Edit Draft                    | `PATCH /quotations/:id`                 | Version-checked updates; conflicting edits preserve unsaved input                                           |
+| Delete Draft                  | `DELETE /quotations/:id`                | Soft-delete after confirmation                                                                              |
+| Submit                        | `POST /quotations/:id/submit`           | Draft → Pending approval                                                                                    |
+| Manager approval              | `POST /quotations/:id/approve`          | Pending approval → Approved                                                                                 |
+| Manager rejection             | `POST /quotations/:id/reject`           | Return to Draft with reason                                                                                 |
+| Withdraw                      | `POST /quotations/:id/withdraw`         | Return pending submission to Draft with reason                                                              |
+| Issue                         | `POST /quotations/:id/issue`            | Record manual issue; replacement can supersede prior offer                                                  |
+| Buyer response                | `POST /quotations/:id/buyer-response`   | Record acceptance or decline with evidence reference                                                        |
+| Revise                        | `POST /quotations/:id/revisions`        | Create a new editable Draft; original remains until replacement is issued                                   |
+| Void                          | `POST /quotations/:id/void`             | Cancel eligible offer with reason                                                                           |
+| Convert                       | `POST /quotations/:id/convert`          | Accepted offer → one linked Draft sales order                                                               |
+| PDF                           | `GET /quotations/:id/pdf`               | Download backend-generated offer PDF                                                                        |
 | Form prerequisites / identity | `GET /reference-data/quotation-options` | Active scoped buyers, contacts, addresses, teams, owners, styles, variants, actor and company business date |
 
-The read-only reference-data endpoint was added because quotation editing requires master data and a trusted actor identity. There are still exactly 15 quotation operations. The sales order is shown as a linked summary; a separate sales-order workspace is outside the quotation API scope. Other future modules are visibly disabled.
+The read-only reference-data endpoint was added because quotation editing requires master data and a trusted actor identity. There are still exactly 15 quotation operations. The sales order is shown as a linked summary; the Sales Orders workspace opens from the linked order number. Other future modules are visibly disabled.
 
 Drafts may have unfinished commercial terms or zero prices. Save & submit additionally requires complete terms, addresses, dates, a contact and positive prices. The server remains authoritative for eligibility, totals, snapshots and authorization. Save & submit is two requests: if submission fails after saving, the same saved Draft is retained for correction and retry.
 
@@ -98,6 +98,10 @@ TanStack Query owns server state. Redux owns UI state (navigation, workspace, no
 
 Styles use CSS Modules and semantic custom properties in `src/styles/variables.css`; `tokens.js` supplies the same palette to Material UI. Components provide accessible labels, keyboard controls, loading/error/empty states and responsive layouts. Wide garment tables scroll inside their own container on small screens. The app uses a locally bundled Inter font.
 
+## Manual journey testing
+
+See the [quotation testing guide](docs/quotation-testing-guide.md) for screen-to-API mapping, sample input, returned fields, four step-by-step journeys and expected results.
+
 ## Verification
 
 ```sh
@@ -122,3 +126,15 @@ TEST_DB_NAME=erp_quotation_test npm run test:e2e
 ```
 
 The Playwright configuration starts Sales and Manager test APIs on ports 4310 and 4311. Browser requests are routed to those APIs. If reusing an existing Next development server, start it with `NEXT_PUBLIC_API_URL=http://localhost:4000`, `NEXT_PUBLIC_MANAGER_API_URL=http://localhost:4101` and `NEXT_PUBLIC_ENABLE_DEMO_WORKSPACES=true`. Tests exercise six garment lines, approval, PDF bytes, acceptance, conversion after a lost response, stale edits, deletion, revision/supersession, decline, void, withdrawal, rejection and mobile navigation. Screenshots and failure traces are written to ignored `test-results/`.
+
+## Sales Orders frontend
+
+The Sales Orders list, direct Draft create/edit, converted Draft editor and detail screens integrate all 15 Sales Orders APIs. Detail includes Overview, Delivery, Revisions and Activity, plus role-aware confirm/hold/resume/amend/cancel/close/delete dialogs. View immutable document snapshots and download selected revision PDFs.
+
+See [screen/API mapping and testing journeys](docs/sales-order-testing-guide.md). Feature services/hooks/pages/components/schemas live in `src/features/sales-orders`; shared form controls and the garment editor live in `src/components/forms`. Existing Redux, theme tokens, Axios and query providers are reused. Pages own API hooks; components only consume data and callbacks.
+
+Create/confirm/amendment retain the original key and body for uncertain-outcome retries. Direct and quotation-converted Drafts have different editable fields; the latter never sends frozen commercial fields. Quotation detail links to the converted order, which links back to the source quotation.
+
+## Customers
+
+Customers list/create/profile/edit screens are available under **Orders → Customers**. All six Customers APIs are integrated, including nested contacts/addresses, archive/reactivate reason dialogs, scoped commercial history, blocker recovery, create idempotency and version conflicts. See [screen/API journeys and test setup](docs/customers-journeys.md). Add `NEXT_PUBLIC_ADMIN_API_URL=http://localhost:4102` with development workspaces enabled and run an Admin backend on4102 for local master-data writes. Sales/manager customer access stays read-only. Production uses its authenticated backend principal.

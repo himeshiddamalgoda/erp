@@ -1,4 +1,5 @@
 "use client";
+import { quotationDefaultsForCustomer } from "@/utils/customer";
 import { useEffect, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
@@ -65,6 +66,7 @@ export function QuotationForm({
   onCancel,
   onReload,
   initialError,
+  initialCustomerId,
 }) {
   const dispatch = useDispatch();
   const submissionIntent = useRef("save");
@@ -78,7 +80,13 @@ export function QuotationForm({
             )
           : quotationSchema,
       )(values, context, resolverOptions),
-    defaultValues: toFormValues(quotation, options.company.businessDate),
+    defaultValues: toFormValues(
+      quotation ||
+        quotationDefaultsForCustomer(
+          options.customers.find((c) => c.id === initialCustomerId),
+        ),
+      options.company.businessDate,
+    ),
     mode: "onTouched",
     reValidateMode: "onChange",
   });

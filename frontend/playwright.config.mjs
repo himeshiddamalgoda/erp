@@ -29,11 +29,13 @@ export default defineConfig({
         NEXT_PUBLIC_API_URL: "http://localhost:4000",
         NEXT_PUBLIC_ENABLE_DEMO_WORKSPACES: "true",
         NEXT_PUBLIC_MANAGER_API_URL: "http://localhost:4101",
+        NEXT_PUBLIC_ADMIN_API_URL: "http://localhost:4102",
       },
     },
     ...[
       ["sales", 4310],
       ["manager", 4311],
+      ["admin", 4312],
     ].map(([actor, port]) => ({
       command: "node src/server.js",
       cwd: "../backend",

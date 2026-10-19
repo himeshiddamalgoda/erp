@@ -1,0 +1,1190 @@
+openapi: 3.0.3
+info:
+  title: Garment ERP Customers API
+  version: 1.0.0
+  description: Exactly six Customers endpoints. Single-company buyer master. Authentication supplied
+    by trusted upstream middleware; no login/token endpoints are introduced. Development uses
+    server-configured DEV_AUTH_ENABLED=true DEV_ACTOR=admin, prohibited in production. Fields
+    camelCase; contacts.primary maps is_primary; addresses.addressType is canonical. Optional blank
+    strings normalize to null. Exactly-one aggregate invariants enforced in service; at-most-one
+    also enforced by generated nullable MySQL slots.
+servers:
+  - url: http://127.0.0.1:4000/api/v1
+    description: Existing API server (write access depends on configured principal)
+tags:
+  - name: Customers
+paths:
+  /customers:
+    get:
+      operationId: listCustomers
+      summary: Search buyers
+      description: Default Active, actor scope applied before count/pagination. q searches
+        code/name/displayName only. Escape literal backslash, % and _. Broad %q% matching is not
+        indexed full-text search.
+      tags:
+        - Customers
+      x-authentication: Trusted upstream req.user; no caller-controlled role/actor headers. Admin global;
+        other roles scoped by salesTeamIds. Writes require Admin or trusted customers:write;
+        assignment also needs customers:assign.
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Literal substring, trimmed
+          schema:
+            type: string
+            maxLength: 100
+            minLength: 1
+        - name: status
+          in: query
+          required: false
+          description: Stored canonical status is is_active
+          schema:
+            type: string
+            enum:
+              - Active
+              - Archived
+              - All
+            default: Active
+        - name: salesTeamId
+          in: query
+          required: false
+          description: Optional exact filter
+          schema: &a1
+            type: string
+            format: uuid
+        - name: ownerId
+          in: query
+          required: false
+          description: Optional exact filter
+          schema: *a1
+        - name: country
+          in: query
+          required: false
+          description: Configured ISO code
+          schema: &a12
+            type: string
+            maxLength: 2
+            minLength: 2
+            pattern: ^[A-Z]{2}$
+            description: Must belong to COMPANY_COUNTRIES. Input trimmed/uppercased.
+        - name: currency
+          in: query
+          required: false
+          description: Exact currency filter
+          schema: &a13
+            type: string
+            enum:
+              - USD
+              - LKR
+              - GBP
+              - EUR
+        - name: page
+          in: query
+          required: false
+          description: Page number
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000000
+            default: 1
+        - name: pageSize
+          in: query
+          required: false
+          description: Rows per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: sortBy
+          in: query
+          required: false
+          description: Allowlisted sort; ID breaks ties
+          schema:
+            type: string
+            enum:
+              - name
+              - code
+              - createdAt
+            default: name
+        - name: sortOrder
+          in: query
+          required: false
+          description: Sort direction
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: asc
+      responses:
+        "200":
+          description: Customer list; empty data array is valid
+          headers:
+            X-Request-Id:
+              schema: *a1
+            Cache-Control:
+              schema:
+                type: string
+              example: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerList"
+              example:
+                data: []
+                meta:
+                  page: 1
+                  pageSize: 20
+                  total: 0
+        "400": &a2
+          description: INVALID_REQUEST (query/path), MALFORMED_JSON or INVALID_IDEMPOTENCY_KEY
+          headers:
+            X-Request-Id:
+              schema: *a1
+            Cache-Control:
+              schema:
+                type: string
+              example: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401": &a3
+          description: UNAUTHENTICATED or INVALID_PRINCIPAL
+          headers:
+            X-Request-Id:
+              schema: *a1
+            Cache-Control:
+              schema:
+                type: string
+              example: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": &a4
+          description: "INTERNAL_ERROR: sanitized unexpected failure"
+          headers:
+            X-Request-Id:
+              schema: *a1
+            Cache-Control:
+              schema:
+                type: string
+              example: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      operationId: createCustomer
+      summary: Create buyer atomically
+      description: Requires Admin or scoped master-data capability. Idempotency hash binds POST
+        /api/v1/customers and canonical parsed body. Same key/body replays exact saved result after
+        current authorization; a different key creates another buyer even with identical name/email.
+        New records Active. At most 50 active contacts and addresses, 500 stored per type.
+      tags:
+        - Customers
+      x-authentication: Trusted upstream req.user; no caller-controlled role/actor headers. Admin global;
+        other roles scoped by salesTeamIds. Writes require Admin or trusted customers:write;
+        assignment also needs customers:assign.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Reuse on unknown timeout; never create a fresh key for the same attempt
+          schema:
+            type: string
+            maxLength: 128
+            minLength: 1
+            pattern: ^[!-~]+$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerCreateInput"
+            example:
+              name: Ocean Apparel (Pvt) Ltd
+              displayName: Ocean Apparel
+              country: LK
+              currency: USD
+              paymentTerms: 30% advance; 70% before shipment
+              salesTeamId: 20000000-0000-4000-8000-000000000001
+              ownerId: 10000000-0000-4000-8000-000000000001
+              email: office@example.test
+              phone: +94 11 234 5678
+              website: https://example.test
+              registrationNumber: DEMO-PV-001
+              internalNotes: Prefers colour-and-size packing breakdowns
+              contacts:
+                - name: Nimal Silva
+                  jobTitle: Buyer
+                  email: buyer@example.test
+                  phone: +94 77 123 4567
+                  primary: true
+              addresses:
+                - addressType: billing
+                  label: Head Office
+                  line1: 14 Sample Road
+                  city: Colombo
+                  country: LK
+                  isDefault: true
+                - addressType: shipping
+                  label: Warehouse A
+                  line1: 25 Sample Warehouse Road
+                  city: Colombo
+                  country: LK
+                  isDefault: true
+                - addressType: shipping
+                  label: Warehouse B
+                  line1: 8 Sample Industrial Road
+                  city: Gampaha
+                  country: LK
+      responses:
+        "201":
+          description: Created or authorized idempotent replay
+          headers:
+            X-Request-Id:
+              schema: *a1
+            Cache-Control:
+              schema:
+                type: string
+              example: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerResponse"
+              example:
+                data: &a5
+                  name: Ocean Apparel (Pvt) Ltd
+                  displayName: Ocean Apparel
+                  country: LK
+                  currency: USD
+                  paymentTerms: 30% advance; 70% before shipment
+                  salesTeamId: 20000000-0000-4000-8000-000000000001
+                  ownerId: 10000000-0000-4000-8000-000000000001
+                  email: office@example.test
+                  phone: +94 11 234 5678
+                  website: https://example.test
+                  registrationNumber: DEMO-PV-001
+                  internalNotes: Prefers colour-and-size packing breakdowns
+                  contacts:
+                    - name: Nimal Silva
+                      jobTitle: Buyer
+                      email: buyer@example.test
+                      phone: +94 77 123 4567
+                      primary: true
+                      id: 60000000-0000-4000-8000-000000000002
+                      isActive: true
+                      createdAt: 2026-10-19T00:00:00.000Z
+                      updatedAt: 2026-10-19T00:00:00.000Z
+                  addresses:
+                    - addressType: billing
+                      label: Head Office
+                      line1: 14 Sample Road
+                      city: Colombo
+                      country: LK
+                      isDefault: true
+                      id: 40000000-0000-4000-8000-000000000003
+                      isActive: true
+                      createdAt: 2026-10-19T00:00:00.000Z
+                      updatedAt: 2026-10-19T00:00:00.000Z
+                    - addressType: shipping
+                      label: Warehouse A
+                      line1: 25 Sample Warehouse Road
+                      city: Colombo
+                      country: LK
+                      isDefault: true
+                      id: 40000000-0000-4000-8000-000000000004
+                      isActive: true
+                      createdAt: 2026-10-19T00:00:00.000Z
+                      updatedAt: 2026-10-19T00:00:00.000Z
+                    - addressType: shipping
+                      label: Warehouse B
+                      line1: 8 Sample Industrial Road
+                      city: Gampaha
+                      country: LK
+                      id: 40000000-0000-4000-8000-000000000005
+                      isActive: true
+                      isDefault: false
+                      createdAt: 2026-10-19T00:00:00.000Z
+                      updatedAt: 2026-10-19T00:00:00.000Z
+                  id: 30000000-0000-4000-8000-000000000002
+                  code: CUS-000001
+                  version: 1
+                  status: Active
+                  salesTeam:
+                    id: 20000000-0000-4000-8000-000000000001
+                    name: Apparel Sales
+                  owner:
+                    id: 10000000-0000-4000-8000-000000000001
+                    displayName: Demo Sales
+                  createdAt: 2026-10-19T00:00:00.000Z
+                  updatedAt: 2026-10-19T00:00:00.000Z
+                  createdBy: 10000000-0000-4000-8000-000000000003
+                  updatedBy: 10000000-0000-4000-8000-000000000003
+                  archivedAt: null
+                  archivedBy: null
+                  archiveReason: null
+                  allowedActions:
+                    - edit
+                    - archive
+                  commercialSummary:
+                    blockerCount: 0
+                    visibleBlockerCount: 0
+                    openQuotationCount: 0
+                    draftOrderCount: 0
+                    activeOrderCount: 0
+                    canArchive: true
+                    archiveBlockers: []
+                    restrictedBlockers: false
+                    countsScope: all-company
+                    blockerCountScope: all-dependent-documents
+        "400": *a2
+        "401": *a3
+        "403": &a8
+          description: "FORBIDDEN: master-data or assignment permission required"
+          headers:
+            X-Request-Id:
+              schema: *a1
+            Cache-Control:
+              schema:
+                type: string
+              example: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404": &a6
+          description: NOT_FOUND including out-of-scope customers
+          headers:
+            X-Request-Id:
+              schema: *a1
+            Cache-Control:
+              schema:
+                type: string
+              example: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409": &a9
+          description: STALE_VERSION, INVALID_TRANSITION, CUSTOMER_HAS_OPEN_DOCUMENTS, ADDRESS_IN_USE,
+            IDEMPOTENCY_KEY_REUSED or database constraint conflict; blocker details are visibility
+            filtered
+          headers:
+            X-Request-Id:
+              schema: *a1
+            Cache-Control:
+              schema:
+                type: string
+              example: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413": &a10
+          description: PAYLOAD_TOO_LARGE (>1 MB JSON)
+          headers:
+            X-Request-Id:
+              schema: *a1
+            Cache-Control:
+              schema:
+                type: string
+              example: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422": &a11
+          description: VALIDATION_ERROR, INVALID_CHILD_REFERENCE or INVALID_TEAM_OWNER
+          headers:
+            X-Request-Id:
+              schema: *a1
+            Cache-Control:
+              schema:
+                type: string
+              example: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": *a4
+  /customers/{id}:
+    get:
+      operationId: getCustomer
+      summary: Read profile and bounded commercial summary
+      description: Archived profiles remain readable. Active children by default; edit/history requests
+        includeInactiveChildren=true. Document examples max20 and visibility filtered; blockerCount
+        is all dependent records; other counts are actor-visible. commercialSummary.canArchive is
+        factual eligibility; allowedActions additionally reflects permission. History uses existing
+        document list APIs with customerId; no unbounded history.
+      tags:
+        - Customers
+      x-authentication: Trusted upstream req.user; no caller-controlled role/actor headers. Admin global;
+        other roles scoped by salesTeamIds. Writes require Admin or trusted customers:write;
+        assignment also needs customers:assign.
+      parameters:
+        - &a7
+          name: id
+          in: path
+          required: true
+          description: Customer UUID
+          schema: *a1
+        - name: includeInactiveChildren
+          in: query
+          required: false
+          description: True includes deactivated rows (at most500/type)
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Customer profile
+          headers:
+            X-Request-Id:
+              schema: *a1
+            Cache-Control:
+              schema:
+                type: string
+              example: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerResponse"
+              example:
+                data: *a5
+        "400": *a2
+        "401": *a3
+        "404": *a6
+        "500": *a4
+    patch:
+      operationId: patchCustomer
+      summary: Edit buyer and nested change sets
+      description: Checks version under customer UPDATE lock; exactly one parent version increment if
+        anything changes. Clears affected default/primary slots first. All changes, audit and flags
+        roll back together. Archived repairs allowed; same child completeness rules. Changing
+        assignment requires both IDs + reason and assignment permission. Existing
+        documents/snapshots never rewritten. Deactivation blocked by live Draft billing/shipping IDs
+        in either module; frozen or snapshot-only use does not block.
+      tags:
+        - Customers
+      x-authentication: Trusted upstream req.user; no caller-controlled role/actor headers. Admin global;
+        other roles scoped by salesTeamIds. Writes require Admin or trusted customers:write;
+        assignment also needs customers:assign.
+      parameters:
+        - *a7
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerPatchInput"
+            example:
+              version: 1
+              addresses:
+                - id: 40000000-0000-4000-8000-000000000004
+                  isDefault: false
+                - id: 40000000-0000-4000-8000-000000000005
+                  isDefault: true
+      responses:
+        "200":
+          description: Updated detail including inactive children; no-op returns unchanged version
+          headers:
+            X-Request-Id:
+              schema: *a1
+            Cache-Control:
+              schema:
+                type: string
+              example: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerResponse"
+        "400": *a2
+        "401": *a3
+        "403": *a8
+        "404": *a6
+        "409": *a9
+        "413": *a10
+        "422": *a11
+        "500": *a4
+  /customers/{id}/archive:
+    post:
+      operationId: archiveCustomer
+      summary: Archive buyer
+      description: Active → Archived. Mandatory reason/version. All nondeleted revisions
+        Draft/PendingApproval/Approved/Issued/Accepted and Draft orders block. Stale date-expired
+        Issued offers conservatively block with validityEnded hint; resolve through existing
+        quotation workflow. Confirmed order fulfilment continues. Checks all dependencies under
+        parent lock with fresh READ COMMITTED reads; never locks document rows in reverse order.
+      tags:
+        - Customers
+      x-authentication: Trusted upstream req.user; no caller-controlled role/actor headers. Admin global;
+        other roles scoped by salesTeamIds. Writes require Admin or trusted customers:write;
+        assignment also needs customers:assign.
+      parameters:
+        - *a7
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LifecycleInput"
+            example:
+              version: 3
+              reason: Buyer account no longer used
+      responses:
+        "200":
+          description: Archived profile; children preserved
+          headers:
+            X-Request-Id:
+              schema: *a1
+            Cache-Control:
+              schema:
+                type: string
+              example: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerResponse"
+        "400": *a2
+        "401": *a3
+        "403": *a8
+        "404": *a6
+        "409": *a9
+        "413": *a10
+        "422": *a11
+        "500": *a4
+  /customers/{id}/reactivate:
+    post:
+      operationId: reactivateCustomer
+      summary: Reactivate repaired buyer
+      description: Archived → Active after revalidating full master, active team/owner/membership and
+        primary/default child completeness. Repair through PATCH first. Clears current archive
+        metadata and retains append-only history. Never reopens commercial documents.
+      tags:
+        - Customers
+      x-authentication: Trusted upstream req.user; no caller-controlled role/actor headers. Admin global;
+        other roles scoped by salesTeamIds. Writes require Admin or trusted customers:write;
+        assignment also needs customers:assign.
+      parameters:
+        - *a7
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LifecycleInput"
+            example:
+              version: 4
+              reason: Buyer resumed purchases
+      responses:
+        "200":
+          description: Active profile
+          headers:
+            X-Request-Id:
+              schema: *a1
+            Cache-Control:
+              schema:
+                type: string
+              example: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerResponse"
+        "400": *a2
+        "401": *a3
+        "403": *a8
+        "404": *a6
+        "409": *a9
+        "413": *a10
+        "422": *a11
+        "500": *a4
+components:
+  schemas:
+    CustomerCreateInput:
+      type: object
+      additionalProperties: false
+      properties:
+        name: &a26
+          type: string
+          maxLength: 200
+          minLength: 2
+        displayName: &a27
+          type: string
+          maxLength: 150
+          nullable: true
+        country: *a12
+        currency: *a13
+        paymentTerms: &a28
+          type: string
+          maxLength: 500
+          minLength: 1
+        salesTeamId: *a1
+        ownerId: *a1
+        email: &a14
+          type: string
+          maxLength: 254
+          nullable: true
+          format: email
+          description: Trim; preserve local-part case; lowercase domain. No delivery/ownership verification.
+        phone: &a15
+          type: string
+          maxLength: 40
+          nullable: true
+          description: International prefixes, spaces, parentheses, dots and hyphens; 7–18 digits.
+        website: &a29
+          type: string
+          maxLength: 500
+          nullable: true
+          format: uri
+          description: Absolute http/https only. Stored as text; never fetched.
+        registrationNumber: &a30
+          type: string
+          maxLength: 100
+          nullable: true
+        internalNotes: &a31
+          type: string
+          maxLength: 5000
+          nullable: true
+        contacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContactCreate"
+          maxItems: 100
+          minItems: 1
+        addresses:
+          type: array
+          items:
+            $ref: "#/components/schemas/AddressCreate"
+          maxItems: 100
+          minItems: 2
+      required:
+        - name
+        - country
+        - currency
+        - paymentTerms
+        - salesTeamId
+        - ownerId
+        - contacts
+        - addresses
+    ContactCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        name: &a16
+          type: string
+          maxLength: 150
+          minLength: 1
+        jobTitle: &a17
+          type: string
+          maxLength: 100
+          nullable: true
+        email: *a14
+        phone: *a15
+        primary:
+          type: boolean
+          default: false
+        isActive:
+          type: boolean
+          default: true
+      required:
+        - name
+    AddressCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        addressType: &a19
+          type: string
+          enum:
+            - billing
+            - shipping
+        label: &a20
+          type: string
+          maxLength: 100
+          nullable: true
+        line1: &a21
+          type: string
+          maxLength: 200
+          minLength: 1
+        line2: &a22
+          type: string
+          maxLength: 200
+          nullable: true
+        city: &a23
+          type: string
+          maxLength: 100
+          minLength: 1
+        region: &a24
+          type: string
+          maxLength: 100
+          nullable: true
+        postalCode: &a25
+          type: string
+          maxLength: 30
+          nullable: true
+        country: *a12
+        isDefault:
+          type: boolean
+          default: false
+        isActive:
+          type: boolean
+          default: true
+      required:
+        - addressType
+        - line1
+        - city
+        - country
+    ExistingContactChange:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *a1
+        name: *a16
+        jobTitle: *a17
+        email: *a14
+        phone: *a15
+        primary: &a18
+          type: boolean
+        isActive: *a18
+      required:
+        - id
+    ExistingAddressChange:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *a1
+        addressType: *a19
+        label: *a20
+        line1: *a21
+        line2: *a22
+        city: *a23
+        region: *a24
+        postalCode: *a25
+        country: *a12
+        isDefault: *a18
+        isActive: *a18
+      required:
+        - id
+    CustomerPatchInput:
+      type: object
+      additionalProperties: false
+      properties:
+        version: &a32
+          type: integer
+          minimum: 1
+          maximum: 4294967295
+        name: *a26
+        displayName: *a27
+        country: *a12
+        currency: *a13
+        paymentTerms: *a28
+        salesTeamId: *a1
+        ownerId: *a1
+        email: *a14
+        phone: *a15
+        website: *a29
+        registrationNumber: *a30
+        internalNotes: *a31
+        reason:
+          type: string
+          maxLength: 1000
+          minLength: 1
+        contacts:
+          type: array
+          items:
+            oneOf:
+              - $ref: "#/components/schemas/ExistingContactChange"
+              - $ref: "#/components/schemas/ContactCreate"
+          maxItems: 100
+        addresses:
+          type: array
+          items:
+            oneOf:
+              - $ref: "#/components/schemas/ExistingAddressChange"
+              - $ref: "#/components/schemas/AddressCreate"
+          maxItems: 100
+      required:
+        - version
+      description: Aggregate change set; omitted fields/children and empty arrays preserve existing rows.
+        Child IDs belong to this customer and appear once. Existing child flags have no defaults.
+        New children use create defaults. Address type is immutable. Final state needs exactly one
+        active primary and one active default per address type. Ownership changes require both
+        assignment IDs plus reason. No-op keeps version/audit unchanged; stale no-op still
+        conflicts.
+    LifecycleInput:
+      type: object
+      additionalProperties: false
+      properties:
+        version: *a32
+        reason:
+          type: string
+          maxLength: 1000
+          minLength: 1
+      required:
+        - version
+        - reason
+    Contact:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *a1
+        name: *a16
+        jobTitle: *a17
+        email: *a14
+        phone: *a15
+        primary: *a18
+        isActive: *a18
+        createdAt: &a33
+          type: string
+          format: date-time
+        updatedAt: *a33
+      required:
+        - id
+        - name
+        - primary
+        - isActive
+        - createdAt
+        - updatedAt
+    Address:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *a1
+        addressType: *a19
+        label: *a20
+        line1: *a21
+        line2: *a22
+        city: *a23
+        region: *a24
+        postalCode: *a25
+        country: *a12
+        isDefault: *a18
+        isActive: *a18
+        createdAt: *a33
+        updatedAt: *a33
+      required:
+        - id
+        - addressType
+        - line1
+        - city
+        - country
+        - isDefault
+        - isActive
+        - createdAt
+        - updatedAt
+    Blocker:
+      type: object
+      additionalProperties: false
+      properties:
+        entityType:
+          type: string
+          enum:
+            - quotation
+            - sales_order
+        id: *a1
+        number:
+          type: string
+          maxLength: 50
+        status:
+          type: string
+          maxLength: 32
+        validityEnded: *a18
+        href:
+          type: string
+          maxLength: 200
+      required:
+        - entityType
+        - id
+        - number
+        - status
+        - validityEnded
+        - href
+    BlockerDetails:
+      type: object
+      additionalProperties: false
+      properties:
+        blockerCount: &a34
+          type: integer
+          minimum: 0
+        visibleBlockerCount: &a35
+          type: integer
+          minimum: 0
+        openQuotationCount: &a36
+          type: integer
+          minimum: 0
+        draftOrderCount: &a37
+          type: integer
+          minimum: 0
+        archiveBlockers: &a38
+          type: array
+          items:
+            $ref: "#/components/schemas/Blocker"
+          maxItems: 20
+        restrictedBlockers: *a18
+        countsScope: &a39
+          type: string
+          enum:
+            - all-company
+            - actor-visible-teams
+        blockerCountScope: &a40
+          type: string
+          enum:
+            - all-dependent-documents
+      required:
+        - blockerCount
+        - visibleBlockerCount
+        - openQuotationCount
+        - draftOrderCount
+        - archiveBlockers
+        - restrictedBlockers
+        - countsScope
+        - blockerCountScope
+    CommercialSummary:
+      type: object
+      additionalProperties: false
+      properties:
+        blockerCount: *a34
+        visibleBlockerCount: *a35
+        openQuotationCount: *a36
+        draftOrderCount: *a37
+        archiveBlockers: *a38
+        restrictedBlockers: *a18
+        countsScope: *a39
+        blockerCountScope: *a40
+        activeOrderCount:
+          type: integer
+          minimum: 0
+        canArchive: *a18
+      required:
+        - blockerCount
+        - visibleBlockerCount
+        - openQuotationCount
+        - draftOrderCount
+        - archiveBlockers
+        - restrictedBlockers
+        - countsScope
+        - blockerCountScope
+        - activeOrderCount
+        - canArchive
+    CustomerSummary:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *a1
+        code: &a41
+          type: string
+          maxLength: 30
+        name: *a26
+        displayName: *a27
+        country: *a12
+        currency: *a13
+        status: &a42
+          type: string
+          enum:
+            - Active
+            - Archived
+        version: *a32
+        salesTeam: &a43
+          type: object
+          additionalProperties: false
+          properties:
+            id: *a1
+            name:
+              type: string
+              maxLength: 200
+          required:
+            - id
+            - name
+        owner: &a44
+          type: object
+          additionalProperties: false
+          properties:
+            id: *a1
+            displayName:
+              type: string
+              maxLength: 200
+          required:
+            - id
+            - displayName
+      required:
+        - id
+        - code
+        - name
+        - country
+        - currency
+        - status
+        - salesTeam
+        - owner
+        - version
+    CustomerDetail:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *a1
+        code: *a41
+        name: *a26
+        displayName: *a27
+        country: *a12
+        currency: *a13
+        status: *a42
+        version: *a32
+        salesTeam: *a43
+        owner: *a44
+        paymentTerms: *a28
+        salesTeamId: *a1
+        ownerId: *a1
+        email: *a14
+        phone: *a15
+        website: *a29
+        registrationNumber: *a30
+        internalNotes: *a31
+        contacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Contact"
+          maxItems: 500
+        addresses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Address"
+          maxItems: 500
+        createdAt: *a33
+        updatedAt: *a33
+        createdBy: *a1
+        updatedBy: *a1
+        archivedAt:
+          type: string
+          format: date-time
+          nullable: true
+        archivedBy:
+          type: string
+          format: uuid
+          nullable: true
+        archiveReason:
+          type: string
+          maxLength: 1000
+          nullable: true
+        allowedActions:
+          type: array
+          items:
+            type: string
+            enum:
+              - edit
+              - archive
+              - reactivate
+          maxItems: 3
+        commercialSummary:
+          $ref: "#/components/schemas/CommercialSummary"
+      required:
+        - id
+        - code
+        - name
+        - country
+        - currency
+        - paymentTerms
+        - salesTeamId
+        - ownerId
+        - status
+        - version
+        - salesTeam
+        - owner
+        - contacts
+        - addresses
+        - createdAt
+        - updatedAt
+        - createdBy
+        - updatedBy
+        - archivedAt
+        - archivedBy
+        - archiveReason
+        - allowedActions
+        - commercialSummary
+    CustomerResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/CustomerDetail"
+      required:
+        - data
+    CustomerList:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CustomerSummary"
+          maxItems: 100
+        meta:
+          type: object
+          additionalProperties: false
+          properties:
+            page:
+              type: integer
+              minimum: 1
+            pageSize:
+              type: integer
+              minimum: 1
+              maximum: 100
+            total:
+              type: integer
+              minimum: 0
+          required:
+            - page
+            - pageSize
+            - total
+      required:
+        - data
+        - meta
+    Error:
+      type: object
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          properties:
+            code:
+              type: string
+              enum:
+                - INVALID_REQUEST
+                - MALFORMED_JSON
+                - INVALID_IDEMPOTENCY_KEY
+                - UNAUTHENTICATED
+                - INVALID_PRINCIPAL
+                - FORBIDDEN
+                - NOT_FOUND
+                - STALE_VERSION
+                - VERSION_EXHAUSTED
+                - SEQUENCE_EXHAUSTED
+                - INVALID_TRANSITION
+                - INVALID_CHILD_REFERENCE
+                - INVALID_TEAM_OWNER
+                - CUSTOMER_HAS_OPEN_DOCUMENTS
+                - ADDRESS_IN_USE
+                - IDEMPOTENCY_KEY_REUSED
+                - CONSTRAINT_CONFLICT
+                - REFERENCED_RECORD_CONFLICT
+                - VALIDATION_ERROR
+                - PAYLOAD_TOO_LARGE
+                - INTERNAL_ERROR
+            message:
+              type: string
+            fields:
+              type: object
+              additionalProperties:
+                type: string
+            details:
+              $ref: "#/components/schemas/BlockerDetails"
+            requestId: *a1
+          required:
+            - code
+            - message
+            - requestId
+      required:
+        - error

@@ -9,6 +9,7 @@ services:
       DEV_AUTH_ENABLED: "${DEV_AUTH_ENABLED:-false}"
       DEV_ACTOR: "${DEV_ACTOR:-sales}"
       COMPANY_TIMEZONE: "${COMPANY_TIMEZONE:-Asia/Colombo}"
+      COMPANY_COUNTRIES: "${COMPANY_COUNTRIES:-US,LK,GB,DE,FR,IN,BD,CN,PK,VN,AU,CA}"
       COMPANY_NAME: "${COMPANY_NAME:-Garment ERP}"
       PORT: "${PORT:-4000}"
       FRONTEND_URL: "${FRONTEND_URL:-http://localhost:3000}"

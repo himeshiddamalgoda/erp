@@ -1,0 +1,1880 @@
+openapi: 3.0.3
+info:
+  title: Garment ERP Sales Orders
+  version: 1.0.0
+  description: Exactly 15 HTTP operations. Trusted middleware supplies req.user;
+    no actor headers or login endpoints. Admin has global scope, others are team
+    scoped. Bearer/cookie authentication belongs to the host application. Dev
+    fixed actor is configured only on each backend. No public
+    fulfilment-ingestion endpoint. Outbox dispatch disabled until an
+    authenticated integration is wired.
+servers:
+  - url: http://localhost:4000/api/v1
+    description: Sales development backend
+  - url: http://localhost:4101/api/v1
+    description: Manager development backend
+tags:
+  - name: Sales Orders
+paths:
+  /sales-orders:
+    get:
+      tags:
+        - Sales Orders
+      summary: List sales orders
+      description: Search order number, buyer snapshot name and buyer PO. Excludes
+        soft-deleted orders. Admin global; other actors limited to assigned
+        teams. Stable ID tie-breaker.
+      operationId: Listsalesorders
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+            maxLength: 100
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: &a26
+              - Draft
+              - Confirmed
+              - InProgress
+              - PartiallyDelivered
+              - Delivered
+              - Closed
+              - Cancelled
+        - name: customerId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: salesTeamId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: ownerId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: source
+          in: query
+          schema:
+            type: string
+            enum:
+              - direct
+              - quotation
+        - name: onHold
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+        - name: deliveryFrom
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: deliveryTo
+          in: query
+          schema:
+            type: string
+            format: date
+        - &a10
+          name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - &a11
+          name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum:
+              - createdAt
+              - updatedAt
+              - orderDate
+              - orderNumber
+              - total
+              - requestedDeliveryDate
+            default: createdAt
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: desc
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OrderSummary"
+                  meta:
+                    $ref: "#/components/schemas/Meta"
+                required:
+                  - data
+                  - meta
+        "400": &a1
+          description: Malformed query, JSON or required header
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401": &a2
+          description: Missing, malformed or inactive trusted principal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403": &a3
+          description: Role cannot perform this action
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404": &a4
+          description: Missing or out-of-scope order/document revision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409": &a5
+          description: Concurrency, lifecycle, normalized PO, frozen source or idempotency
+            conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422": &a6
+          description: Invalid editable fields or missing confirmation requirements
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": &a7
+          description: Sanitized unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      tags:
+        - Sales Orders
+      summary: Create direct Draft
+      description: Idempotent direct Draft creation. Quotation conversion stays under
+        the quotation resource and is not an additional Sales Orders operation.
+      operationId: CreatedirectDraft
+      parameters:
+        - &a9
+          name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+            pattern: ^[!-~]+$
+          description: Persist and reuse the exact key, original body and path for a
+            retry. Changed request returns 409 IDEMPOTENCY_KEY_REUSED. Replays
+            still authorize current actor scope.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DirectOrderInput"
+      responses:
+        "201":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/OrderDetail"
+                required:
+                  - data
+        "400": *a1
+        "401": *a2
+        "403": *a3
+        "404": *a4
+        "409": *a5
+        "422": *a6
+        "500": *a7
+  /sales-orders/{id}:
+    get:
+      tags:
+        - Sales Orders
+      summary: Get sales order
+      description: ""
+      operationId: Getsalesorder
+      parameters:
+        - &a8
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/OrderDetail"
+                required:
+                  - data
+        "400": *a1
+        "401": *a2
+        "403": *a3
+        "404": *a4
+        "409": *a5
+        "422": *a6
+        "500": *a7
+    patch:
+      tags:
+        - Sales Orders
+      summary: Edit Draft order
+      description: ""
+      operationId: EditDraftorder
+      parameters:
+        - *a8
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchOrderInput"
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/OrderDetail"
+                required:
+                  - data
+        "400": *a1
+        "401": *a2
+        "403": *a3
+        "404": *a4
+        "409": *a5
+        "422": *a6
+        "500": *a7
+    delete:
+      tags:
+        - Sales Orders
+      summary: Delete Draft order
+      description: Soft-delete only. No request body. Preserves lines and source
+        quotation uniqueness.
+      operationId: DeleteDraftorder
+      parameters:
+        - *a8
+        - name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: ^"[1-9][0-9]{0,9}"$
+            example: '"3"'
+      responses:
+        "204":
+          description: Draft soft-deleted; empty response
+        "400": *a1
+        "401": *a2
+        "403": *a3
+        "404": *a4
+        "409": *a5
+        "422": *a6
+        "500": *a7
+  /sales-orders/{id}/confirm:
+    post:
+      tags:
+        - Sales Orders
+      summary: Confirm order
+      description: "Manager/Admin: validates complete active master data, PO, positive
+        prices and delivery date; writes revision 1, queued handoff and audit
+        atomically. No external network call."
+      operationId: Confirmorder
+      parameters:
+        - *a8
+        - *a9
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                version:
+                  type: integer
+                  minimum: 1
+                  maximum: 4294967295
+                comment:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000
+              required:
+                - version
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/OrderDetail"
+                required:
+                  - data
+        "400": *a1
+        "401": *a2
+        "403": *a3
+        "404": *a4
+        "409": *a5
+        "422": *a6
+        "500": *a7
+  /sales-orders/{id}/cancel:
+    post:
+      tags:
+        - Sales Orders
+      summary: Cancel order
+      description: "Manager/Admin: Draft or Confirmed with queued/unclaimed handoff
+        and no activity. Retains source quotation conversion and history."
+      operationId: Cancelorder
+      parameters:
+        - *a8
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                version:
+                  type: integer
+                  minimum: 1
+                  maximum: 4294967295
+                reason:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000
+              required:
+                - version
+                - reason
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/OrderDetail"
+                required:
+                  - data
+        "400": *a1
+        "401": *a2
+        "403": *a3
+        "404": *a4
+        "409": *a5
+        "422": *a6
+        "500": *a7
+  /sales-orders/{id}/close:
+    post:
+      tags:
+        - Sales Orders
+      summary: Close order
+      description: "Manager/Admin: Delivered only, every line complete, no
+        ambiguous/failed handoff. No payment assertion."
+      operationId: Closeorder
+      parameters:
+        - *a8
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                version:
+                  type: integer
+                  minimum: 1
+                  maximum: 4294967295
+                comment:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000
+              required:
+                - version
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/OrderDetail"
+                required:
+                  - data
+        "400": *a1
+        "401": *a2
+        "403": *a3
+        "404": *a4
+        "409": *a5
+        "422": *a6
+        "500": *a7
+  /sales-orders/{id}/hold:
+    post:
+      tags:
+        - Sales Orders
+      summary: Hold order
+      description: "Manager/Admin: Confirmed and queued/unclaimed only. Hold is
+        orthogonal; resume releases local dispatch eligibility without claiming
+        production started."
+      operationId: Holdorder
+      parameters:
+        - *a8
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                version:
+                  type: integer
+                  minimum: 1
+                  maximum: 4294967295
+                reason:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000
+              required:
+                - version
+                - reason
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/OrderDetail"
+                required:
+                  - data
+        "400": *a1
+        "401": *a2
+        "403": *a3
+        "404": *a4
+        "409": *a5
+        "422": *a6
+        "500": *a7
+  /sales-orders/{id}/resume:
+    post:
+      tags:
+        - Sales Orders
+      summary: Resume order
+      description: "Manager/Admin: Confirmed and queued/unclaimed only. Hold is
+        orthogonal; resume releases local dispatch eligibility without claiming
+        production started."
+      operationId: Resumeorder
+      parameters:
+        - *a8
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                version:
+                  type: integer
+                  minimum: 1
+                  maximum: 4294967295
+                reason:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000
+              required:
+                - version
+                - reason
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/OrderDetail"
+                required:
+                  - data
+        "400": *a1
+        "401": *a2
+        "403": *a3
+        "404": *a4
+        "409": *a5
+        "422": *a6
+        "500": *a7
+  /sales-orders/{id}/revisions:
+    post:
+      tags:
+        - Sales Orders
+      summary: Create operational amendment
+      description: "Manager/Admin: queued Confirmed order only, with no activity.
+        Changes delivery, shipping and public notes only. Same ID/number/status;
+        increments documentRevision and version; appends immutable snapshot and
+        updates outbox payload atomically. Hold flag preserved."
+      operationId: Createoperationalamendment
+      parameters:
+        - *a8
+        - *a9
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AmendmentInput"
+      responses:
+        "201":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AmendmentResult"
+                required:
+                  - data
+        "400": *a1
+        "401": *a2
+        "403": *a3
+        "404": *a4
+        "409": *a5
+        "422": *a6
+        "500": *a7
+    get:
+      tags:
+        - Sales Orders
+      summary: List document revisions
+      description: Newest first. Draft has empty history. Snapshots exclude internal notes.
+      operationId: Listdocumentrevisions
+      parameters:
+        - *a8
+        - *a10
+        - *a11
+        - name: revision
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Revision"
+                  meta:
+                    $ref: "#/components/schemas/Meta"
+                required:
+                  - data
+                  - meta
+        "400": *a1
+        "401": *a2
+        "403": *a3
+        "404": *a4
+        "409": *a5
+        "422": *a6
+        "500": *a7
+  /sales-orders/{id}/activity:
+    get:
+      tags:
+        - Sales Orders
+      summary: List order activity
+      description: Paginated shared audit timeline, including private integration
+        events exactly once. No secrets or integration credentials returned.
+      operationId: Listorderactivity
+      parameters:
+        - *a8
+        - *a10
+        - *a11
+        - name: action
+          in: query
+          schema:
+            type: string
+            enum: &a55
+              - create
+              - update
+              - delete
+              - confirm
+              - cancel
+              - close
+              - hold
+              - resume
+              - revision
+              - handoff_claim
+              - handoff_dispatched
+              - handoff_acknowledged
+              - handoff_failed
+              - ProductionStarted
+              - ShipmentPosted
+              - DeliveryConfirmed
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Activity"
+                  meta:
+                    $ref: "#/components/schemas/Meta"
+                required:
+                  - data
+                  - meta
+        "400": *a1
+        "401": *a2
+        "403": *a3
+        "404": *a4
+        "409": *a5
+        "422": *a6
+        "500": *a7
+  /sales-orders/{id}/fulfilment:
+    get:
+      tags:
+        - Sales Orders
+      summary: Get per line fulfilment
+      description: Only DeliveryConfirmed quantities contribute to delivery. No events
+        means zero delivered. Demo label without a real integration.
+        latestEvents capped at 20; use activity pagination for older timeline
+        entries.
+      operationId: Getperlinefulfilment
+      parameters:
+        - *a8
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Fulfilment"
+                required:
+                  - data
+        "400": *a1
+        "401": *a2
+        "403": *a3
+        "404": *a4
+        "409": *a5
+        "422": *a6
+        "500": *a7
+  /sales-orders/{id}/pdf:
+    get:
+      tags:
+        - Sales Orders
+      summary: Download order confirmation PDF
+      description: Latest immutable document by default; explicit missing revision is
+        404. Draft without revisions renders current Draft with watermark.
+        Historical supersession and current hold/cancellation displayed
+        separately. No internal notes, cost or margin.
+      operationId: DownloadorderconfirmationPDF
+      parameters:
+        - *a8
+        - name: revision
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Buyer-visible PDF
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: Safe attachment filename
+            Cache-Control:
+              schema:
+                type: string
+                example: private, no-store
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "400": *a1
+        "401": *a2
+        "403": *a3
+        "404": *a4
+        "409": *a5
+        "422": *a6
+        "500": *a7
+components:
+  schemas:
+    Money:
+      type: string
+      pattern: ^\d+\.\d{2}$
+      example: "5500.00"
+      description: Exact decimal amount encoded as a string.
+    LineInput:
+      type: object
+      additionalProperties: false
+      properties:
+        styleId:
+          type: string
+          format: uuid
+        colour:
+          type: string
+          minLength: 1
+          maxLength: 60
+        size:
+          type: string
+          minLength: 1
+          maxLength: 30
+        qty:
+          type: integer
+          minimum: 1
+          maximum: 1000000
+        unitPrice:
+          type: string
+          pattern: ^(?:0|[1-9]\d{0,7})(?:\.\d{1,2})?$
+          example: "5.50"
+      required:
+        - styleId
+        - colour
+        - size
+        - qty
+        - unitPrice
+    Line:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        lineNo:
+          type: integer
+          minimum: 1
+        variantId:
+          type: string
+          format: uuid
+        styleId:
+          type: string
+          format: uuid
+        styleCode:
+          type: string
+        styleName:
+          type: string
+        fabric:
+          type: string
+        gsm:
+          type: integer
+          minimum: 0
+          nullable: true
+        colour:
+          type: string
+        size:
+          type: string
+        uom:
+          type: string
+          enum:
+            - PCS
+        qty:
+          type: integer
+          minimum: 1
+          maximum: 1000000
+        unitPrice:
+          $ref: "#/components/schemas/Money"
+        lineTotal:
+          $ref: "#/components/schemas/Money"
+      required:
+        - id
+        - lineNo
+        - variantId
+        - styleId
+        - styleCode
+        - styleName
+        - fabric
+        - gsm
+        - colour
+        - size
+        - uom
+        - qty
+        - unitPrice
+        - lineTotal
+    Contact:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        isPrimary:
+          oneOf:
+            - type: boolean
+            - type: integer
+              enum:
+                - 0
+                - 1
+      required:
+        - id
+        - name
+        - email
+        - phone
+        - isPrimary
+    Buyer:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        country:
+          type: string
+          pattern: ^[A-Z]{2}$
+        currency:
+          type: string
+          enum:
+            - USD
+            - LKR
+            - GBP
+            - EUR
+        contacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Contact"
+      required:
+        - id
+        - code
+        - name
+        - country
+        - currency
+        - contacts
+    Address:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        addressType:
+          type: string
+          enum:
+            - billing
+            - shipping
+        line1:
+          type: string
+        line2:
+          type: string
+          nullable: true
+        city:
+          type: string
+        postalCode:
+          type: string
+          nullable: true
+        country:
+          type: string
+          pattern: ^[A-Z]{2}$
+      required:
+        - id
+        - addressType
+        - line1
+        - line2
+        - city
+        - postalCode
+        - country
+    DirectOrderInput:
+      type: object
+      additionalProperties: false
+      properties:
+        customerId: &a12
+          type: string
+          format: uuid
+        salesTeamId: &a13
+          type: string
+          format: uuid
+        ownerId: &a14
+          type: string
+          format: uuid
+        currency: &a15
+          type: string
+          enum:
+            - USD
+            - LKR
+            - GBP
+            - EUR
+        orderDate: &a16
+          type: string
+          format: date
+        buyerPoNumber: &a17
+          type: string
+          minLength: 1
+          maxLength: 100
+          nullable: true
+        buyerPoDate: &a18
+          type: string
+          format: date
+          nullable: true
+        requestedDeliveryDate: &a19
+          type: string
+          format: date
+          nullable: true
+        billingAddressId: &a20
+          type: string
+          format: uuid
+          nullable: true
+        shippingAddressId: &a21
+          type: string
+          format: uuid
+          nullable: true
+        paymentTerms: &a22
+          type: string
+          minLength: 1
+          maxLength: 500
+          nullable: true
+        publicNotes: &a23
+          type: string
+          maxLength: 5000
+          nullable: true
+        internalNotes: &a24
+          type: string
+          maxLength: 5000
+          nullable: true
+        lines: &a25
+          type: array
+          items:
+            $ref: "#/components/schemas/LineInput"
+          minItems: 1
+          maxItems: 500
+      required:
+        - customerId
+        - salesTeamId
+        - ownerId
+        - currency
+        - lines
+      description: Direct Draft only. sourceQuotationId/status/numbers/totals/actors
+        are rejected. orderDate defaults to the company business date. No
+        quotation conversion bypass.
+    PatchOrderInput:
+      type: object
+      additionalProperties: false
+      properties:
+        version:
+          type: integer
+          minimum: 1
+          maximum: 4294967295
+        customerId: *a12
+        salesTeamId: *a13
+        ownerId: *a14
+        currency: *a15
+        orderDate: *a16
+        buyerPoNumber: *a17
+        buyerPoDate: *a18
+        requestedDeliveryDate: *a19
+        billingAddressId: *a20
+        shippingAddressId: *a21
+        paymentTerms: *a22
+        publicNotes: *a23
+        internalNotes: *a24
+        lines: *a25
+      required:
+        - version
+      minProperties: 2
+      description: "Direct Draft: any editable input. Converted Draft: only
+        buyerPoNumber, buyerPoDate, requestedDeliveryDate, shippingAddressId,
+        publicNotes, internalNotes, plus version. Frozen fields rejected even if
+        unchanged. Supplying lines replaces all Draft lines."
+    OrderSummary:
+      type: object
+      additionalProperties: false
+      properties:
+        id: &a27
+          type: string
+          format: uuid
+        orderNumber: &a28
+          type: string
+        sourceQuotationId: &a29
+          type: string
+          format: uuid
+          nullable: true
+        sourceQuoteNumber: &a30
+          type: string
+          nullable: true
+        sourceRevisionNo: &a31
+          type: integer
+          minimum: 0
+          nullable: true
+        customerId: &a32
+          type: string
+          format: uuid
+        customerName: &a33
+          type: string
+        salesTeamId: &a34
+          type: string
+          format: uuid
+        ownerId: &a35
+          type: string
+          format: uuid
+        status: &a36
+          type: string
+          enum: *a26
+        orderDate: &a37
+          type: string
+          format: date
+        currency: &a38
+          type: string
+          enum:
+            - USD
+            - LKR
+            - GBP
+            - EUR
+        buyerPoNumber: &a39
+          type: string
+          nullable: true
+        buyerPoDate: &a40
+          type: string
+          format: date
+          nullable: true
+        requestedDeliveryDate: &a41
+          type: string
+          format: date
+          nullable: true
+        subtotal: &a42
+          $ref: "#/components/schemas/Money"
+        total: &a43
+          $ref: "#/components/schemas/Money"
+        totalQty: &a44
+          type: integer
+          minimum: 0
+          maximum: 500000000
+        documentRevision: &a45
+          type: integer
+          minimum: 0
+        isOnHold: &a46
+          type: boolean
+        version: &a47
+          type: integer
+          minimum: 1
+        createdAt: &a48
+          type: string
+          format: date-time
+        updatedAt: &a49
+          type: string
+          format: date-time
+        allowedActions: &a50
+          type: array
+          items:
+            type: string
+            enum:
+              - downloadPdf
+              - edit
+              - delete
+              - confirm
+              - cancel
+              - close
+              - hold
+              - resume
+              - revisions
+      required:
+        - id
+        - orderNumber
+        - sourceQuotationId
+        - sourceQuoteNumber
+        - sourceRevisionNo
+        - customerId
+        - customerName
+        - salesTeamId
+        - ownerId
+        - status
+        - orderDate
+        - currency
+        - buyerPoNumber
+        - buyerPoDate
+        - requestedDeliveryDate
+        - subtotal
+        - total
+        - totalQty
+        - documentRevision
+        - isOnHold
+        - version
+        - createdAt
+        - updatedAt
+        - allowedActions
+    Handoff:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        documentRevision:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum:
+            - Queued
+            - Claimed
+            - Dispatched
+            - Acknowledged
+            - Failed
+            - Cancelled
+        externalReference:
+          type: string
+          nullable: true
+        attemptCount:
+          type: integer
+          minimum: 0
+        claimedAt:
+          type: string
+          format: date-time
+          nullable: true
+        dispatchedAt:
+          type: string
+          format: date-time
+          nullable: true
+        acknowledgedAt:
+          type: string
+          format: date-time
+          nullable: true
+        version:
+          type: integer
+          minimum: 1
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - documentRevision
+        - status
+        - externalReference
+        - attemptCount
+        - claimedAt
+        - dispatchedAt
+        - acknowledgedAt
+        - version
+        - createdAt
+        - updatedAt
+    ProgressLine:
+      type: object
+      additionalProperties: false
+      properties:
+        orderLineId:
+          type: string
+          format: uuid
+        styleCode:
+          type: string
+        colour:
+          type: string
+        size:
+          type: string
+        orderedQty:
+          type: integer
+          minimum: 0
+        deliveredQty:
+          type: integer
+          minimum: 0
+        remainingQty:
+          type: integer
+          minimum: 0
+      required:
+        - orderLineId
+        - styleCode
+        - colour
+        - size
+        - orderedQty
+        - deliveredQty
+        - remainingQty
+    Progress:
+      type: object
+      additionalProperties: false
+      properties:
+        orderedQty: &a51
+          type: integer
+          minimum: 0
+        deliveredQty: &a52
+          type: integer
+          minimum: 0
+        remainingQty: &a53
+          type: integer
+          minimum: 0
+        lines: &a54
+          type: array
+          items:
+            $ref: "#/components/schemas/ProgressLine"
+      required:
+        - orderedQty
+        - deliveredQty
+        - remainingQty
+        - lines
+    OrderDetail:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *a27
+        orderNumber: *a28
+        sourceQuotationId: *a29
+        sourceQuoteNumber: *a30
+        sourceRevisionNo: *a31
+        customerId: *a32
+        customerName: *a33
+        salesTeamId: *a34
+        ownerId: *a35
+        status: *a36
+        orderDate: *a37
+        currency: *a38
+        buyerPoNumber: *a39
+        buyerPoDate: *a40
+        requestedDeliveryDate: *a41
+        subtotal: *a42
+        total: *a43
+        totalQty: *a44
+        documentRevision: *a45
+        isOnHold: *a46
+        version: *a47
+        createdAt: *a48
+        updatedAt: *a49
+        allowedActions: *a50
+        source:
+          type: string
+          enum:
+            - direct
+            - quotation
+        billingAddressId:
+          type: string
+          format: uuid
+          nullable: true
+        shippingAddressId:
+          type: string
+          format: uuid
+          nullable: true
+        paymentTerms:
+          type: string
+          nullable: true
+        publicNotes:
+          type: string
+          nullable: true
+        internalNotes:
+          type: string
+          nullable: true
+        customerSnapshot:
+          allOf:
+            - $ref: "#/components/schemas/Buyer"
+          nullable: true
+        billingAddressSnapshot:
+          allOf:
+            - $ref: "#/components/schemas/Address"
+          nullable: true
+        shippingAddressSnapshot:
+          allOf:
+            - $ref: "#/components/schemas/Address"
+          nullable: true
+        holdReason:
+          type: string
+          nullable: true
+        heldBy:
+          type: string
+          format: uuid
+          nullable: true
+        heldAt:
+          type: string
+          format: date-time
+          nullable: true
+        confirmedBy:
+          type: string
+          format: uuid
+          nullable: true
+        confirmedAt:
+          type: string
+          format: date-time
+          nullable: true
+        cancelledBy:
+          type: string
+          format: uuid
+          nullable: true
+        cancelledAt:
+          type: string
+          format: date-time
+          nullable: true
+        cancellationReason:
+          type: string
+          nullable: true
+        closedBy:
+          type: string
+          format: uuid
+          nullable: true
+        closedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdBy:
+          type: string
+          format: uuid
+        updatedBy:
+          type: string
+          format: uuid
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+        deletedBy:
+          type: string
+          format: uuid
+          nullable: true
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/Line"
+        handoff:
+          allOf:
+            - $ref: "#/components/schemas/Handoff"
+          nullable: true
+        fulfilment:
+          $ref: "#/components/schemas/Progress"
+      required:
+        - id
+        - orderNumber
+        - sourceQuotationId
+        - sourceQuoteNumber
+        - sourceRevisionNo
+        - customerId
+        - customerName
+        - salesTeamId
+        - ownerId
+        - status
+        - orderDate
+        - currency
+        - buyerPoNumber
+        - buyerPoDate
+        - requestedDeliveryDate
+        - subtotal
+        - total
+        - totalQty
+        - documentRevision
+        - isOnHold
+        - version
+        - createdAt
+        - updatedAt
+        - allowedActions
+        - source
+        - billingAddressId
+        - shippingAddressId
+        - paymentTerms
+        - publicNotes
+        - internalNotes
+        - customerSnapshot
+        - billingAddressSnapshot
+        - shippingAddressSnapshot
+        - holdReason
+        - heldBy
+        - heldAt
+        - confirmedBy
+        - confirmedAt
+        - cancelledBy
+        - cancelledAt
+        - cancellationReason
+        - closedBy
+        - closedAt
+        - createdBy
+        - updatedBy
+        - deletedAt
+        - deletedBy
+        - lines
+        - handoff
+        - fulfilment
+    DocumentSnapshot:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        orderNumber:
+          type: string
+        sourceQuotationId:
+          type: string
+          format: uuid
+          nullable: true
+        sourceQuoteNumber:
+          type: string
+          nullable: true
+        sourceRevisionNo:
+          type: integer
+          minimum: 0
+          nullable: true
+        customerId:
+          type: string
+          format: uuid
+        orderDate:
+          type: string
+          format: date
+        currency:
+          type: string
+        buyerPoNumber:
+          type: string
+          nullable: true
+        buyerPoDate:
+          type: string
+          format: date
+          nullable: true
+        requestedDeliveryDate:
+          type: string
+          format: date
+          nullable: true
+        paymentTerms:
+          type: string
+          nullable: true
+        publicNotes:
+          type: string
+          nullable: true
+        customerSnapshot:
+          allOf:
+            - $ref: "#/components/schemas/Buyer"
+          nullable: true
+        billingAddressSnapshot:
+          allOf:
+            - $ref: "#/components/schemas/Address"
+          nullable: true
+        shippingAddressSnapshot:
+          allOf:
+            - $ref: "#/components/schemas/Address"
+          nullable: true
+        subtotal:
+          $ref: "#/components/schemas/Money"
+        total:
+          $ref: "#/components/schemas/Money"
+        documentRevision:
+          type: integer
+          minimum: 0
+        totalQty:
+          type: integer
+          minimum: 0
+        seller:
+          type: object
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+          required:
+            - name
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/Line"
+      required:
+        - id
+        - orderNumber
+        - sourceQuotationId
+        - sourceQuoteNumber
+        - sourceRevisionNo
+        - customerId
+        - orderDate
+        - currency
+        - buyerPoNumber
+        - buyerPoDate
+        - requestedDeliveryDate
+        - paymentTerms
+        - publicNotes
+        - customerSnapshot
+        - billingAddressSnapshot
+        - shippingAddressSnapshot
+        - subtotal
+        - total
+        - documentRevision
+        - totalQty
+        - seller
+        - lines
+    Revision:
+      type: object
+      additionalProperties: false
+      properties:
+        revision:
+          type: integer
+          minimum: 1
+        reason:
+          type: string
+        buyerReference:
+          type: string
+          nullable: true
+        createdBy:
+          type: string
+          format: uuid
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        snapshotSchemaVersion:
+          type: integer
+          minimum: 1
+        snapshot:
+          $ref: "#/components/schemas/DocumentSnapshot"
+      required:
+        - revision
+        - reason
+        - buyerReference
+        - createdBy
+        - createdAt
+        - snapshotSchemaVersion
+        - snapshot
+    AmendmentInput:
+      type: object
+      additionalProperties: false
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        buyerReference:
+          type: string
+          minLength: 1
+          maxLength: 500
+        changes:
+          type: object
+          additionalProperties: false
+          properties:
+            requestedDeliveryDate:
+              type: string
+              format: date
+            shippingAddressId:
+              type: string
+              format: uuid
+            publicNotes:
+              type: string
+              maxLength: 5000
+              nullable: true
+          minProperties: 1
+      required:
+        - version
+        - reason
+        - buyerReference
+        - changes
+    AmendmentResult:
+      type: object
+      additionalProperties: false
+      properties:
+        order:
+          $ref: "#/components/schemas/OrderDetail"
+        revision:
+          $ref: "#/components/schemas/Revision"
+      required:
+        - order
+        - revision
+    Event:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider:
+          type: string
+        externalEventId:
+          type: string
+        eventType:
+          type: string
+          enum:
+            - ProductionStarted
+            - ShipmentPosted
+            - DeliveryConfirmed
+        externalReference:
+          type: string
+          nullable: true
+        occurredAt:
+          type: string
+          format: date-time
+        receivedAt:
+          type: string
+          format: date-time
+        source:
+          type: string
+          enum:
+            - demo
+            - integration
+      required:
+        - id
+        - provider
+        - externalEventId
+        - eventType
+        - externalReference
+        - occurredAt
+        - receivedAt
+        - source
+    Fulfilment:
+      type: object
+      additionalProperties: false
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: *a26
+        source:
+          type: string
+          enum:
+            - demo
+            - integration
+        orderedQty: *a51
+        deliveredQty: *a52
+        remainingQty: *a53
+        lines: *a54
+        handoff:
+          allOf:
+            - $ref: "#/components/schemas/Handoff"
+          nullable: true
+        latestEvents:
+          type: array
+          items:
+            $ref: "#/components/schemas/Event"
+          maxItems: 20
+      required:
+        - orderId
+        - status
+        - source
+        - orderedQty
+        - deliveredQty
+        - remainingQty
+        - lines
+        - handoff
+        - latestEvents
+    Activity:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          enum: *a55
+        actor:
+          type: object
+          additionalProperties: false
+          properties:
+            id:
+              type: string
+              format: uuid
+            displayName:
+              type: string
+          required:
+            - id
+            - displayName
+          nullable: true
+        occurredAt:
+          type: string
+          format: date-time
+        fromStatus:
+          type: string
+          nullable: true
+        toStatus:
+          type: string
+          nullable: true
+        reason:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: false
+          properties:
+            sourceQuotationId:
+              type: string
+              format: uuid
+            source:
+              type: string
+            fields:
+              type: array
+              items:
+                type: string
+            shippingChange:
+              type: object
+              additionalProperties: false
+              properties:
+                from:
+                  type: string
+                  format: uuid
+                  nullable: true
+                to:
+                  type: string
+                  format: uuid
+                  nullable: true
+              required:
+                - from
+                - to
+            documentRevision:
+              type: integer
+              minimum: 0
+            buyerReference:
+              type: string
+            changedFields:
+              type: array
+              items:
+                type: string
+            handoffId:
+              type: string
+              format: uuid
+            eventId:
+              type: string
+              format: uuid
+            provider:
+              type: string
+            externalEventId:
+              type: string
+          nullable: true
+      required:
+        - id
+        - action
+        - actor
+        - occurredAt
+        - fromStatus
+        - toStatus
+        - reason
+        - metadata
+    Meta:
+      type: object
+      additionalProperties: false
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          minimum: 0
+      required:
+        - page
+        - pageSize
+        - total
+    Error:
+      type: object
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          properties:
+            code:
+              type: string
+              enum:
+                - INVALID_REQUEST
+                - MALFORMED_JSON
+                - INVALID_IF_MATCH
+                - INVALID_IDEMPOTENCY_KEY
+                - UNAUTHENTICATED
+                - INVALID_PRINCIPAL
+                - FORBIDDEN
+                - NOT_FOUND
+                - VALIDATION_ERROR
+                - STALE_VERSION
+                - INVALID_TRANSITION
+                - DUPLICATE_BUYER_PO
+                - FROZEN_QUOTATION_FIELDS
+                - CANCELLATION_BLOCKED
+                - HOLD_BLOCKED
+                - AMENDMENT_BLOCKED
+                - IDEMPOTENCY_KEY_REUSED
+                - DELIVERY_INCOMPLETE
+                - CONSTRAINT_CONFLICT
+                - REFERENCED_RECORD_CONFLICT
+                - INTERNAL_ERROR
+            message:
+              type: string
+            fields:
+              type: object
+              additionalProperties:
+                type: string
+            requestId:
+              type: string
+          required:
+            - code
+            - message
+            - requestId
+      required:
+        - error

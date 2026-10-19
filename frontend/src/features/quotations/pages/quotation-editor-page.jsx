@@ -22,18 +22,28 @@ import { QuotationForm } from "../components/quotation-form";
 import { AppShell } from "@/components/layout/app-shell";
 import { LoadingState, ErrorState } from "@/components/ui/page-state";
 import styles from "../quotations.module.css";
-export default function QuotationEditorPage({ id }) {
+export default function QuotationEditorPage({ id, initialCustomerId }) {
   const workspace = useSelector((s) => s.ui.workspace);
   const base = getApiBaseUrl(workspace);
   // Changing identity must unmount local form state as well as separating query keys.
-  return <EditorWorkspace key={`${base}:${id || "new"}`} base={base} id={id} />;
+  return (
+    <EditorWorkspace
+      key={`${base}:${id || initialCustomerId || "new"}`}
+      base={base}
+      id={id}
+      initialCustomerId={initialCustomerId}
+    />
+  );
 }
-function EditorWorkspace({ base, id }) {
+function EditorWorkspace({ base, id, initialCustomerId }) {
   const router = useRouter();
   const dispatch = useDispatch();
   const dirty = useSelector((s) => s.ui.editorDirty);
   const [savedQuote, setSavedQuote] = useState(null);
-  const references = useQuotationOptions(base);
+  const references = useQuotationOptions(
+    base,
+    initialCustomerId ? { refetchOnMount: "always" } : {},
+  );
   const detail = useQuotation(base, id || savedQuote?.id);
   const mutations = useQuotationMutations(base);
   const [formKey, setFormKey] = useState(0);
@@ -125,7 +135,9 @@ function EditorWorkspace({ base, id }) {
         </div>
         <FilePenLine size={24} className={styles.documentIcon} />
       </div>
-      {references.isPending || (id && detail.isPending) ? (
+      {references.isPending ||
+      (initialCustomerId && !references.isFetchedAfterMount) ||
+      (id && detail.isPending) ? (
         <LoadingState />
       ) : references.error || detail.error ? (
         <ErrorState
@@ -166,6 +178,7 @@ function EditorWorkspace({ base, id }) {
             </Alert>
           )}
           <QuotationForm
+            initialCustomerId={initialCustomerId}
             key={formKey}
             quotation={quotation}
             options={references.data}

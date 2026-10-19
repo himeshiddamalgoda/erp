@@ -1,0 +1,616 @@
+{
+  "info": {
+    "name": "Garment ERP - Sales Orders",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "15 Sales Orders operations plus existing reference-data lookup. Run folder 1 in order. Folders 2/3/4 need the documented states or a new disposable order. No public fulfilment ingestion route; use CLI fixtures then Refresh detail before Close. Numeric versions are stored from responses. Postman retains the original key/body across missing responses or 5xx; the next retry reuses both. Definitive responses clear the saved attempt."
+  },
+  "variable": [
+    {
+      "key": "salesBaseUrl",
+      "value": "http://localhost:4000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "managerBaseUrl",
+      "value": "http://localhost:4101/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "customerId",
+      "value": "30000000-0000-4000-8000-000000000001",
+      "type": "string"
+    },
+    {
+      "key": "salesTeamId",
+      "value": "20000000-0000-4000-8000-000000000001",
+      "type": "string"
+    },
+    {
+      "key": "ownerId",
+      "value": "10000000-0000-4000-8000-000000000001",
+      "type": "string"
+    },
+    {
+      "key": "billingAddressId",
+      "value": "40000000-0000-4000-8000-000000000001",
+      "type": "string"
+    },
+    {
+      "key": "shippingAddressId",
+      "value": "40000000-0000-4000-8000-000000000002",
+      "type": "string"
+    },
+    {
+      "key": "styleId",
+      "value": "50000000-0000-4000-8000-000000000001",
+      "type": "string"
+    },
+    {
+      "key": "orderId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "version",
+      "value": "1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Direct order - create, confirm, hold, amend, resume",
+      "item": [
+        {
+          "name": "Load form choices and company date",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{salesBaseUrl}}/reference-data/quotation-options",
+            "description": "Backend actor is determined by the selected fixed development server. Never send actor headers. For uncertain-outcome idempotent retries keep the original attempt key AND original version/body. Unknown transport/5xx outcomes retain the key and original body for the next retry. Definitive responses clear the attempt."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "if(pm.response.code===200)pm.collectionVariables.set('businessDate',pm.response.json().data.company.businessDate);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create six-line direct Draft",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{attemptKey}}"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/sales-orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"salesTeamId\": \"{{salesTeamId}}\",\n  \"ownerId\": \"{{ownerId}}\",\n  \"currency\": \"USD\",\n  \"orderDate\": \"{{businessDate}}\",\n  \"buyerPoNumber\": \"{{buyerPoNumber}}\",\n  \"buyerPoDate\": \"{{businessDate}}\",\n  \"requestedDeliveryDate\": \"{{deliveryDate}}\",\n  \"billingAddressId\": \"{{billingAddressId}}\",\n  \"shippingAddressId\": \"{{shippingAddressId}}\",\n  \"paymentTerms\": \"30% advance; 70% before shipment\",\n  \"publicNotes\": \"Pack by colour and size\",\n  \"internalNotes\": \"Internal QA only\",\n  \"lines\": [\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"Navy\",\n      \"size\": \"S\",\n      \"qty\": 200,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"Navy\",\n      \"size\": \"M\",\n      \"qty\": 200,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"Navy\",\n      \"size\": \"L\",\n      \"qty\": 100,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"White\",\n      \"size\": \"S\",\n      \"qty\": 200,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"White\",\n      \"size\": \"M\",\n      \"qty\": 200,\n      \"unitPrice\": \"5.50\"\n    },\n    {\n      \"styleId\": \"{{styleId}}\",\n      \"colour\": \"White\",\n      \"size\": \"L\",\n      \"qty\": 100,\n      \"unitPrice\": \"5.50\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Backend actor is determined by the selected fixed development server. Never send actor headers. For uncertain-outcome idempotent retries keep the original attempt key AND original version/body. Unknown transport/5xx outcomes retain the key and original body for the next retry. Definitive responses clear the attempt."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d=new Date();const day=d.toLocaleDateString('en-CA',{timeZone:'Asia/Colombo'});pm.variables.set('businessDate',pm.collectionVariables.get('businessDate')||day);const future=new Date(pm.variables.get('businessDate')+'T12:00:00Z');future.setUTCDate(future.getUTCDate()+45);pm.variables.set('deliveryDate',future.toISOString().slice(0,10));pm.variables.set('buyerPoNumber','PM-'+pm.variables.replaceIn('{{$guid}}'));",
+                  "const scope='soAttempt:'+pm.request.method+':'+pm.variables.replaceIn(pm.request.url.toString());pm.variables.set('soAttemptScope',scope);let saved=pm.collectionVariables.get(scope);saved=saved?JSON.parse(saved):{key:pm.variables.replaceIn('{{$guid}}'),body:pm.variables.replaceIn(pm.request.body.raw)};pm.collectionVariables.set(scope,JSON.stringify(saved));pm.variables.set('attemptKey',saved.key);pm.request.body.update(saved.body);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201',()=>pm.response.to.have.status(201));",
+                  "if(pm.response.code < 300){const d=pm.response.json().data;pm.collectionVariables.set('orderId',d.id);pm.collectionVariables.set('version',String(d.version));}",
+                  "if(pm.response.code<500)pm.collectionVariables.unset(pm.variables.get('soAttemptScope'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inspect detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{salesBaseUrl}}/sales-orders/{{orderId}}",
+            "description": "Backend actor is determined by the selected fixed development server. Never send actor headers. For uncertain-outcome idempotent retries keep the original attempt key AND original version/body. Unknown transport/5xx outcomes retain the key and original body for the next retry. Definitive responses clear the attempt."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "if(pm.response.code < 300){const d=pm.response.json().data;pm.collectionVariables.set('orderId',d.id);pm.collectionVariables.set('version',String(d.version));}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Edit operational Draft fields",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{salesBaseUrl}}/sales-orders/{{orderId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{version}},\n  \"publicNotes\": \"Pack by colour - reviewed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Backend actor is determined by the selected fixed development server. Never send actor headers. For uncertain-outcome idempotent retries keep the original attempt key AND original version/body. Unknown transport/5xx outcomes retain the key and original body for the next retry. Definitive responses clear the attempt."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "if(pm.response.code < 300){const d=pm.response.json().data;pm.collectionVariables.set('orderId',d.id);pm.collectionVariables.set('version',String(d.version));}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Manager confirm",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{attemptKey}}"
+              }
+            ],
+            "url": "{{managerBaseUrl}}/sales-orders/{{orderId}}/confirm",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{version}},\n  \"comment\": \"PO and delivery checked\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Backend actor is determined by the selected fixed development server. Never send actor headers. For uncertain-outcome idempotent retries keep the original attempt key AND original version/body. Unknown transport/5xx outcomes retain the key and original body for the next retry. Definitive responses clear the attempt."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const scope='soAttempt:'+pm.request.method+':'+pm.variables.replaceIn(pm.request.url.toString());pm.variables.set('soAttemptScope',scope);let saved=pm.collectionVariables.get(scope);saved=saved?JSON.parse(saved):{key:pm.variables.replaceIn('{{$guid}}'),body:pm.variables.replaceIn(pm.request.body.raw)};pm.collectionVariables.set(scope,JSON.stringify(saved));pm.variables.set('attemptKey',saved.key);pm.request.body.update(saved.body);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "if(pm.response.code < 300){const d=pm.response.json().data;pm.collectionVariables.set('orderId',d.id);pm.collectionVariables.set('version',String(d.version));}",
+                  "if(pm.response.code<500)pm.collectionVariables.unset(pm.variables.get('soAttemptScope'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Manager hold queued handoff",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{managerBaseUrl}}/sales-orders/{{orderId}}/hold",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{version}},\n  \"reason\": \"Buyer asked to review delivery\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Backend actor is determined by the selected fixed development server. Never send actor headers. For uncertain-outcome idempotent retries keep the original attempt key AND original version/body. Unknown transport/5xx outcomes retain the key and original body for the next retry. Definitive responses clear the attempt."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "if(pm.response.code < 300){const d=pm.response.json().data;pm.collectionVariables.set('orderId',d.id);pm.collectionVariables.set('version',String(d.version));}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Manager operational amendment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{attemptKey}}"
+              }
+            ],
+            "url": "{{managerBaseUrl}}/sales-orders/{{orderId}}/revisions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{version}},\n  \"reason\": \"Buyer changed packing instruction\",\n  \"buyerReference\": \"Buyer email\",\n  \"changes\": {\n    \"publicNotes\": \"Deliver grouped by colour\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Backend actor is determined by the selected fixed development server. Never send actor headers. For uncertain-outcome idempotent retries keep the original attempt key AND original version/body. Unknown transport/5xx outcomes retain the key and original body for the next retry. Definitive responses clear the attempt."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const scope='soAttempt:'+pm.request.method+':'+pm.variables.replaceIn(pm.request.url.toString());pm.variables.set('soAttemptScope',scope);let saved=pm.collectionVariables.get(scope);saved=saved?JSON.parse(saved):{key:pm.variables.replaceIn('{{$guid}}'),body:pm.variables.replaceIn(pm.request.body.raw)};pm.collectionVariables.set(scope,JSON.stringify(saved));pm.variables.set('attemptKey',saved.key);pm.request.body.update(saved.body);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201',()=>pm.response.to.have.status(201));",
+                  "if(pm.response.code < 300){const d=pm.response.json().data.order;pm.collectionVariables.set('orderId',d.id);pm.collectionVariables.set('version',String(d.version));}",
+                  "if(pm.response.code<500)pm.collectionVariables.unset(pm.variables.get('soAttemptScope'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Manager resume",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{managerBaseUrl}}/sales-orders/{{orderId}}/resume",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{version}},\n  \"reason\": \"Buyer approved instruction\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Backend actor is determined by the selected fixed development server. Never send actor headers. For uncertain-outcome idempotent retries keep the original attempt key AND original version/body. Unknown transport/5xx outcomes retain the key and original body for the next retry. Definitive responses clear the attempt."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "if(pm.response.code < 300){const d=pm.response.json().data;pm.collectionVariables.set('orderId',d.id);pm.collectionVariables.set('version',String(d.version));}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Read screens and immutable documents",
+      "item": [
+        {
+          "name": "List direct orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{salesBaseUrl}}/sales-orders?page=1&pageSize=20&source=direct&sortBy=createdAt&sortOrder=desc",
+            "description": "Backend actor is determined by the selected fixed development server. Never send actor headers. For uncertain-outcome idempotent retries keep the original attempt key AND original version/body. Unknown transport/5xx outcomes retain the key and original body for the next retry. Definitive responses clear the attempt."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delivery progress",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{salesBaseUrl}}/sales-orders/{{orderId}}/fulfilment",
+            "description": "Backend actor is determined by the selected fixed development server. Never send actor headers. For uncertain-outcome idempotent retries keep the original attempt key AND original version/body. Unknown transport/5xx outcomes retain the key and original body for the next retry. Definitive responses clear the attempt."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Revisions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{salesBaseUrl}}/sales-orders/{{orderId}}/revisions?page=1&pageSize=20",
+            "description": "Backend actor is determined by the selected fixed development server. Never send actor headers. For uncertain-outcome idempotent retries keep the original attempt key AND original version/body. Unknown transport/5xx outcomes retain the key and original body for the next retry. Definitive responses clear the attempt."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Activity",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{salesBaseUrl}}/sales-orders/{{orderId}}/activity?page=1&pageSize=20",
+            "description": "Backend actor is determined by the selected fixed development server. Never send actor headers. For uncertain-outcome idempotent retries keep the original attempt key AND original version/body. Unknown transport/5xx outcomes retain the key and original body for the next retry. Definitive responses clear the attempt."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Download latest PDF",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{salesBaseUrl}}/sales-orders/{{orderId}}/pdf",
+            "description": "Backend actor is determined by the selected fixed development server. Never send actor headers. For uncertain-outcome idempotent retries keep the original attempt key AND original version/body. Unknown transport/5xx outcomes retain the key and original body for the next retry. Definitive responses clear the attempt."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.test('PDF content type',()=>pm.expect(pm.response.headers.get('Content-Type')).to.include('application/pdf'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Download revision 1 PDF",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{salesBaseUrl}}/sales-orders/{{orderId}}/pdf?revision=1",
+            "description": "Backend actor is determined by the selected fixed development server. Never send actor headers. For uncertain-outcome idempotent retries keep the original attempt key AND original version/body. Unknown transport/5xx outcomes retain the key and original body for the next retry. Definitive responses clear the attempt."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.test('PDF content type',()=>pm.expect(pm.response.headers.get('Content-Type')).to.include('application/pdf'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Fixture delivery then close (read instructions first)",
+      "description": "Run backend CLI demo:fulfilment with this orderId partial, then complete. Requests below do not manufacture delivery events.",
+      "item": [
+        {
+          "name": "Refresh version after CLI fixtures",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{salesBaseUrl}}/sales-orders/{{orderId}}",
+            "description": "Backend actor is determined by the selected fixed development server. Never send actor headers. For uncertain-outcome idempotent retries keep the original attempt key AND original version/body. Unknown transport/5xx outcomes retain the key and original body for the next retry. Definitive responses clear the attempt."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "if(pm.response.code < 300){const d=pm.response.json().data;pm.collectionVariables.set('orderId',d.id);pm.collectionVariables.set('version',String(d.version));}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Manager close delivered order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{managerBaseUrl}}/sales-orders/{{orderId}}/close",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{version}},\n  \"comment\": \"Every size delivered\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Backend actor is determined by the selected fixed development server. Never send actor headers. For uncertain-outcome idempotent retries keep the original attempt key AND original version/body. Unknown transport/5xx outcomes retain the key and original body for the next retry. Definitive responses clear the attempt."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "if(pm.response.code < 300){const d=pm.response.json().data;pm.collectionVariables.set('orderId',d.id);pm.collectionVariables.set('version',String(d.version));}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Alternative terminal actions (new disposable Draft)",
+      "description": "Create a fresh Draft before each alternative. Do not delete/cancel the completed order from folder 3.",
+      "item": [
+        {
+          "name": "Manager cancel Draft or queued Confirmed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{managerBaseUrl}}/sales-orders/{{orderId}}/cancel",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": {{version}},\n  \"reason\": \"Buyer withdrew PO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Backend actor is determined by the selected fixed development server. Never send actor headers. For uncertain-outcome idempotent retries keep the original attempt key AND original version/body. Unknown transport/5xx outcomes retain the key and original body for the next retry. Definitive responses clear the attempt."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "if(pm.response.code < 300){const d=pm.response.json().data;pm.collectionVariables.set('orderId',d.id);pm.collectionVariables.set('version',String(d.version));}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete disposable Draft",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "If-Match",
+                "value": "\"{{version}}\""
+              }
+            ],
+            "url": "{{salesBaseUrl}}/sales-orders/{{orderId}}",
+            "description": "Backend actor is determined by the selected fixed development server. Never send actor headers. For uncertain-outcome idempotent retries keep the original attempt key AND original version/body. Unknown transport/5xx outcomes retain the key and original body for the next retry. Definitive responses clear the attempt."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 204',()=>pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

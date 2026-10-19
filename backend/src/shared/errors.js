@@ -24,6 +24,11 @@ export function errorHandler(error, req, res, _next) {
     status = 400;
     code = "MALFORMED_JSON";
   }
+  if (error.type === "entity.too.large") {
+    status = 413;
+    code = "PAYLOAD_TOO_LARGE";
+    message = "JSON body exceeds the 1 MB limit";
+  }
   if (error.name === "SequelizeUniqueConstraintError") {
     status = 409;
     code = "CONSTRAINT_CONFLICT";
@@ -50,6 +55,9 @@ export function errorHandler(error, req, res, _next) {
             ? "Malformed JSON body"
             : message,
       ...(error.fields ? { fields: error.fields } : {}),
+      ...(error instanceof AppError && status < 500 && error.details
+        ? { details: error.details }
+        : {}),
       requestId: req.requestId,
     },
   });
